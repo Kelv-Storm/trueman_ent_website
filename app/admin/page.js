@@ -1,28 +1,62 @@
 "use client";
 import { useEffect, useState } from 'react';
 import { db } from '../../lib/firebase';
-import { collection, query, orderBy, onSnapshot, doc, updateDoc } from 'firebase/firestore';
+import { collection, query, orderBy, onSnapshot, doc, updateDoc, setDoc } from 'firebase/firestore';
 
 export default function AdminDashboard() {
   const [orders, setOrders] = useState([]);
+  const [dateInput, setDateInput] = useState("");
+  const [currentDate, setCurrentDate] = useState("Loading...");
 
+  // Listen to Orders AND the Delivery Date
   useEffect(() => {
     const q = query(collection(db, "orders"), orderBy("createdAt", "desc"));
-    const unsubscribe = onSnapshot(q, (snapshot) => {
+    const unsubOrders = onSnapshot(q, (snapshot) => {
       setOrders(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
     });
-    return () => unsubscribe();
+
+    const unsubDate = onSnapshot(doc(db, "settings", "storeDetails"), (docSnap) => {
+      if (docSnap.exists()) setCurrentDate(docSnap.data().deliveryDate);
+    });
+
+    return () => { unsubOrders(); unsubDate(); };
   }, []);
 
   const markAsPaid = async (orderId) => {
     await updateDoc(doc(db, "orders", orderId), { status: "Paid & Preparing" });
   };
 
+  const saveDeliveryDate = async () => {
+    if (!dateInput) return;
+    await setDoc(doc(db, "settings", "storeDetails"), { deliveryDate: dateInput }, { merge: true });
+    setDateInput("");
+    alert("Delivery date updated successfully!");
+  };
+
   return (
     <div className="min-h-screen bg-slate-900 p-8 text-white">
       <div className="max-w-4xl mx-auto">
-        <h1 className="text-3xl font-black text-orange-500 mb-8">Seller Dashboard</h1>
+        <h1 className="text-3xl font-black text-orange-500 mb-6">Trueman Admin Dashboard</h1>
         
+        {/* Delivery Date Controller */}
+        <div className="bg-slate-800 p-6 rounded-xl border border-slate-700 shadow-xl mb-8 flex items-end gap-4">
+          <div className="flex-1">
+            <p className="text-sm text-slate-400 mb-1">Current Delivery Date Shown to Customers:</p>
+            <p className="text-xl font-bold text-emerald-400 mb-4">{currentDate}</p>
+            <input 
+              type="text" 
+              placeholder="e.g., Saturday, 12th November" 
+              value={dateInput} 
+              onChange={(e) => setDateInput(e.target.value)} 
+              className="w-full bg-slate-900 border border-slate-600 p-3 rounded-lg text-white" 
+            />
+          </div>
+          <button onClick={saveDeliveryDate} className="bg-orange-500 hover:bg-orange-400 text-white font-bold px-6 py-3 rounded-lg">
+            Update Date
+          </button>
+        </div>
+        
+        {/* Orders List */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           {orders.map(order => (
             <div key={order.id} className="bg-slate-800 p-6 rounded-xl border border-slate-700 shadow-xl">
@@ -36,9 +70,11 @@ export default function AdminDashboard() {
                 </span>
               </div>
               
+              {/* Dynamic Items Display */}
               <div className="bg-slate-900/50 p-4 rounded-lg mb-4 text-sm">
-                <p>Mixture: <span className="font-bold text-orange-400">{order.items?.mixture || 0} tins</span></p>
-                <p>Omapodi: <span className="font-bold text-orange-400">{order.items?.omapodi || 0} tins</span></p>
+                {order.items && Object.entries(order.items).map(([itemName, qty]) => (
+                  <p key={itemName}>{itemName}: <span className="font-bold text-orange-400">{qty} tins</span></p>
+                ))}
               </div>
               
               <div className="flex justify-between items-center">
