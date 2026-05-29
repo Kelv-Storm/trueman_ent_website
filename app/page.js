@@ -4,7 +4,6 @@ import { db } from '../lib/firebase';
 import { collection, addDoc, serverTimestamp, doc, onSnapshot } from 'firebase/firestore';
 import { jsPDF } from "jspdf";
 
-// Removed "Spicy Mixture"
 const MENU = [
   { id: 'spicy_dhall', name: 'Spicy Dhall', price: 45, image: '/spicy_dhall.jpg' },
   { id: 'bombay_mixture', name: 'Bombay Spice Mixture', price: 30, image: '/bombay_mixture.jpg' },
@@ -72,6 +71,7 @@ export default function Storefront() {
         items: orderItems,
         total: totalAmount,
         status: "Pending Payment",
+        deliveryDate: deliveryDate, // <-- NOW SAVES THE DELIVERY DATE TO THE ORDER
         createdAt: serverTimestamp()
       });
 
@@ -110,8 +110,15 @@ export default function Storefront() {
     doc.text(`Total Due: $${total}`, 20, yPos + 10);
     
     doc.text("Payment Instructions:", 20, yPos + 30);
+    
     doc.setFontSize(12);
-    doc.text("1. Transfer to Maybank Singapore: 04071077653 (Trueman Enterprise)", 20, yPos + 40);
+    
+    // Bolded PayNow line
+    doc.setFont("helvetica", "bold");
+    doc.text("1. Paynow UEN 53330872X Trueman Enterprise", 20, yPos + 40);
+    
+    // Switch back to normal font for the rest
+    doc.setFont("helvetica", "normal");
     doc.text("2. Put Order ID as Reference", 20, yPos + 50);
     doc.text("3. WhatsApp receipt to +65 9816 4292 (Logan)", 20, yPos + 60);
     
@@ -135,8 +142,6 @@ export default function Storefront() {
         <div className="space-y-4 mb-8">
           {MENU.map((item) => (
             <div key={item.id} className="flex justify-between items-center bg-gray-50 p-3 rounded-lg border hover:border-orange-200 transition-colors">
-              
-              {/* UPGRADED IMAGE LAYOUT: Strict uniform squares */}
               <div className="flex items-center gap-4">
                 <div className="w-20 h-20 aspect-square shrink-0 bg-gray-200 rounded-lg overflow-hidden border border-gray-300 shadow-sm">
                   <img src={item.image} alt={item.name} className="w-full h-full object-cover object-center" />
@@ -146,7 +151,6 @@ export default function Storefront() {
                   <p className="text-sm font-semibold text-orange-600 mt-1">${item.price} / tin</p>
                 </div>
               </div>
-
               <div className="flex gap-3 items-center shrink-0">
                 <button onClick={() => updateCart(item.id, -1)} className="bg-gray-200 hover:bg-gray-300 w-8 h-8 rounded-full font-bold flex items-center justify-center transition-colors text-gray-700">-</button>
                 <span className="font-bold w-5 text-center text-gray-800">{cart[item.id] || 0}</span>
