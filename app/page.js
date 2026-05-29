@@ -4,7 +4,6 @@ import { db } from '../lib/firebase';
 import { collection, addDoc, serverTimestamp, doc, onSnapshot } from 'firebase/firestore';
 import { jsPDF } from "jspdf";
 
-// 👇 YOUR NEW UPDATED MENU LIST 👇
 const MENU = [
   { id: 'spicy_dhall', name: 'Spicy Dhall', price: 45 },
   { id: 'bombay_mixture', name: 'Bombay Spice Mixture', price: 30 },
@@ -25,7 +24,6 @@ export default function Storefront() {
   const [isOrdering, setIsOrdering] = useState(false);
   const [deliveryDate, setDeliveryDate] = useState("Loading...");
 
-  // Fetch the Next Delivery Date from Firebase
   useEffect(() => {
     const unsub = onSnapshot(doc(db, "settings", "storeDetails"), (docSnap) => {
       if (docSnap.exists()) {
@@ -37,12 +35,10 @@ export default function Storefront() {
     return () => unsub();
   }, []);
 
-  // Calculate Total Price
   const totalAmount = MENU.reduce((sum, item) => {
     return sum + (cart[item.id] || 0) * item.price;
   }, 0);
 
-  // Handle + and - buttons
   const updateCart = (itemId, amount) => {
     setCart(prev => ({
       ...prev,
@@ -56,14 +52,22 @@ export default function Storefront() {
     
     setIsOrdering(true);
     
-    // Convert cart into a readable format for your dad's dashboard
     const orderItems = {};
     MENU.forEach(item => {
       if (cart[item.id] > 0) orderItems[item.name] = cart[item.id];
     });
 
+    // Generate Custom Order ID: Customer_Name_YYYY/MM/DD
+    const dateObj = new Date();
+    const yyyy = dateObj.getFullYear();
+    const mm = String(dateObj.getMonth() + 1).padStart(2, '0');
+    const dd = String(dateObj.getDate()).padStart(2, '0');
+    const formattedDate = `${yyyy}/${mm}/${dd}`;
+    const customOrderId = `${customerName.trim().replace(/\s+/g, '_')}_${formattedDate}`;
+
     try {
-      const docRef = await addDoc(collection(db, "orders"), {
+      await addDoc(collection(db, "orders"), {
+        orderId: customOrderId, // Saves the new format to Firebase too!
         customer: customerName,
         phone: phone,
         items: orderItems,
@@ -72,7 +76,8 @@ export default function Storefront() {
         createdAt: serverTimestamp()
       });
 
-      generateInvoice(docRef.id, totalAmount, orderItems);
+      // Pass the new custom ID to the PDF generator
+      generateInvoice(customOrderId, totalAmount, orderItems);
       alert("Order placed! Please check the downloaded PDF for payment details.");
       
       setCart({});
@@ -108,11 +113,13 @@ export default function Storefront() {
     
     doc.text("Payment Instructions:", 20, yPos + 30);
     doc.setFontSize(12);
-    doc.text("1. Scan DuitNow QR or Transfer to Maybank: 1642-XXXX-XXXX", 20, yPos + 40);
-    doc.text(`2. Put Order ID as Reference: ${orderId}`, 20, yPos + 50);
-    doc.text("3. WhatsApp receipt to 012-3456789", 20, yPos + 60);
+    doc.text("1. Transfer to Maybank Singapore: 04071077653 (Trueman Enterprise)", 20, yPos + 40);
+    doc.text("2. Put Order ID as Reference", 20, yPos + 50);
+    doc.text("3. WhatsApp receipt to +65 9816 4292 (Logan)", 20, yPos + 60);
     
-    doc.save(`Trueman_Invoice_${orderId}.pdf`);
+    // Replace slashes with dashes for the filename so it saves safely
+    const safeFilename = orderId.replace(/\//g, '-');
+    doc.save(`Trueman_Invoice_${safeFilename}.pdf`);
   };
 
   return (
