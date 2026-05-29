@@ -4,17 +4,17 @@ import { db } from '../lib/firebase';
 import { collection, addDoc, serverTimestamp, doc, onSnapshot } from 'firebase/firestore';
 import { jsPDF } from "jspdf";
 
+// Removed "Spicy Mixture"
 const MENU = [
-  { id: 'spicy_dhall', name: 'Spicy Dhall', price: 45 },
-  { id: 'bombay_mixture', name: 'Bombay Spice Mixture', price: 30 },
-  { id: 'kara_bounty', name: 'Kara Bounty', price: 30 },
-  { id: 'pagoda', name: 'Pagoda', price: 35 },
-  { id: 'pepper_kara_sev', name: 'Pepper Kara Sev', price: 30 },
-  { id: 'spicy_banana_chips', name: 'Spicy Banana Chips', price: 45 },
-  { id: 'spicy_mixture', name: 'Spicy Mixture', price: 30 },
-  { id: 'salted_peanuts', name: 'Salted Peanuts', price: 50 },
-  { id: 'green_beans', name: 'Green Beans', price: 45 },
-  { id: 'spicy_tapioca_chips', name: 'Spicy Tapioca Chips', price: 30 }
+  { id: 'spicy_dhall', name: 'Spicy Dhall', price: 45, image: '/spicy_dhall.jpg' },
+  { id: 'bombay_mixture', name: 'Bombay Spice Mixture', price: 30, image: '/bombay_mixture.jpg' },
+  { id: 'kara_bounty', name: 'Kara Bounty', price: 30, image: '/kara_bounty.jpg' },
+  { id: 'pagoda', name: 'Pagoda', price: 35, image: '/pagoda.jpg' },
+  { id: 'pepper_kara_sev', name: 'Pepper Kara Sev', price: 30, image: '/pepper_kara_sev.jpg' },
+  { id: 'spicy_banana_chips', name: 'Spicy Banana Chips', price: 45, image: '/spicy_banana_chips.jpg' },
+  { id: 'salted_peanuts', name: 'Salted Peanuts', price: 50, image: '/salted_peanuts.jpg' },
+  { id: 'green_beans', name: 'Green Beans', price: 45, image: '/green_beans.jpg' },
+  { id: 'spicy_tapioca_chips', name: 'Spicy Tapioca Chips', price: 30, image: '/spicy_tapioca_chips.jpg' }
 ];
 
 export default function Storefront() {
@@ -101,7 +101,7 @@ export default function Storefront() {
     
     let yPos = 80;
     Object.entries(items).forEach(([itemName, qty]) => {
-      const itemPrice = MENU.find(m => m.name === itemName).price;
+      const itemPrice = MENU.find(m => m.name === itemName)?.price || 0;
       doc.text(`${itemName} Tins: ${qty} ($${qty * itemPrice})`, 20, yPos);
       yPos += 10;
     });
@@ -120,7 +120,7 @@ export default function Storefront() {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50 p-8 text-black">
+    <div className="min-h-screen bg-gray-50 p-4 md:p-8 text-black">
       <div className="max-w-md mx-auto bg-white p-6 rounded-xl shadow-md border border-gray-100">
         <h1 className="text-3xl font-black text-orange-600 mb-2">Trueman Enterprise</h1>
         <p className="font-bold text-gray-600 mb-6 bg-orange-100 p-2 rounded text-center">
@@ -128,27 +128,35 @@ export default function Storefront() {
         </p>
         
         <div className="space-y-4 mb-8">
-          <input type="text" placeholder="Your Name" value={customerName} onChange={(e) => setCustomerName(e.target.value)} className="w-full border p-3 rounded-lg" />
-          <input type="tel" placeholder="Phone Number" value={phone} onChange={(e) => setPhone(e.target.value)} className="w-full border p-3 rounded-lg" />
+          <input type="text" placeholder="Your Name" value={customerName} onChange={(e) => setCustomerName(e.target.value)} className="w-full border p-3 rounded-lg focus:outline-orange-500 focus:ring-1 focus:ring-orange-500" />
+          <input type="tel" placeholder="Phone Number" value={phone} onChange={(e) => setPhone(e.target.value)} className="w-full border p-3 rounded-lg focus:outline-orange-500 focus:ring-1 focus:ring-orange-500" />
         </div>
         
         <div className="space-y-4 mb-8">
           {MENU.map((item) => (
-            <div key={item.id} className="flex justify-between items-center bg-gray-50 p-4 rounded-lg border">
-              <div>
-                <h3 className="font-bold">{item.name}</h3>
-                <p className="text-sm text-gray-500">${item.price} / tin</p>
+            <div key={item.id} className="flex justify-between items-center bg-gray-50 p-3 rounded-lg border hover:border-orange-200 transition-colors">
+              
+              {/* UPGRADED IMAGE LAYOUT: Strict uniform squares */}
+              <div className="flex items-center gap-4">
+                <div className="w-20 h-20 aspect-square shrink-0 bg-gray-200 rounded-lg overflow-hidden border border-gray-300 shadow-sm">
+                  <img src={item.image} alt={item.name} className="w-full h-full object-cover object-center" />
+                </div>
+                <div>
+                  <h3 className="font-bold leading-tight text-gray-800">{item.name}</h3>
+                  <p className="text-sm font-semibold text-orange-600 mt-1">${item.price} / tin</p>
+                </div>
               </div>
-              <div className="flex gap-4 items-center">
-                <button onClick={() => updateCart(item.id, -1)} className="bg-gray-200 w-8 h-8 rounded-full font-bold">-</button>
-                <span className="font-bold w-4 text-center">{cart[item.id] || 0}</span>
-                <button onClick={() => updateCart(item.id, 1)} className="bg-orange-100 text-orange-600 w-8 h-8 rounded-full font-bold">+</button>
+
+              <div className="flex gap-3 items-center shrink-0">
+                <button onClick={() => updateCart(item.id, -1)} className="bg-gray-200 hover:bg-gray-300 w-8 h-8 rounded-full font-bold flex items-center justify-center transition-colors text-gray-700">-</button>
+                <span className="font-bold w-5 text-center text-gray-800">{cart[item.id] || 0}</span>
+                <button onClick={() => updateCart(item.id, 1)} className="bg-orange-100 hover:bg-orange-200 text-orange-600 w-8 h-8 rounded-full font-bold flex items-center justify-center transition-colors">+</button>
               </div>
             </div>
           ))}
         </div>
 
-        <button onClick={handleCheckout} disabled={isOrdering} className="w-full bg-orange-500 hover:bg-orange-600 text-white font-bold py-4 rounded-lg shadow-lg">
+        <button onClick={handleCheckout} disabled={isOrdering} className="w-full bg-orange-500 hover:bg-orange-600 text-white font-bold py-4 rounded-xl shadow-lg transition-colors text-lg">
           {isOrdering ? "Generating Order..." : `Checkout ($${totalAmount})`}
         </button>
       </div>
