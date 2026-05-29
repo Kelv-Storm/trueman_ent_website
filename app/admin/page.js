@@ -8,7 +8,6 @@ export default function AdminDashboard() {
   const [dateInput, setDateInput] = useState("");
   const [currentDate, setCurrentDate] = useState("Loading...");
 
-  // Listen to Orders AND the Delivery Date
   useEffect(() => {
     const q = query(collection(db, "orders"), orderBy("createdAt", "desc"));
     const unsubOrders = onSnapshot(q, (snapshot) => {
@@ -38,7 +37,6 @@ export default function AdminDashboard() {
       <div className="max-w-4xl mx-auto">
         <h1 className="text-3xl font-black text-orange-500 mb-6">Trueman Admin Dashboard</h1>
         
-        {/* Delivery Date Controller */}
         <div className="bg-slate-800 p-6 rounded-xl border border-slate-700 shadow-xl mb-8 flex items-end gap-4">
           <div className="flex-1">
             <p className="text-sm text-slate-400 mb-1">Current Delivery Date Shown to Customers:</p>
@@ -56,21 +54,27 @@ export default function AdminDashboard() {
           </button>
         </div>
         
-        {/* Orders List */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          {orders.map(order => (
+          {orders.map(order => {
+            // Convert Firebase timestamp to a readable Date (DD/MM/YYYY format)
+            const orderDate = order.createdAt?.toDate 
+              ? order.createdAt.toDate().toLocaleDateString('en-GB') 
+              : "Just now";
+
+            return (
             <div key={order.id} className="bg-slate-800 p-6 rounded-xl border border-slate-700 shadow-xl">
               <div className="flex justify-between items-start mb-4">
                 <div>
                   <h3 className="font-bold text-lg">{order.customer}</h3>
-                  <p className="text-sm text-slate-400">{order.phone}</p>
+                  <p className="text-sm text-slate-400">
+                    {order.phone} &bull; {orderDate}
+                  </p>
                 </div>
                 <span className={`px-3 py-1 rounded-full text-xs font-bold uppercase ${order.status === "Pending Payment" ? "bg-yellow-500/20 text-yellow-400" : "bg-emerald-500/20 text-emerald-400"}`}>
                   {order.status}
                 </span>
               </div>
               
-              {/* Dynamic Items Display */}
               <div className="bg-slate-900/50 p-4 rounded-lg mb-4 text-sm">
                 {order.items && Object.entries(order.items).map(([itemName, qty]) => (
                   <p key={itemName}>{itemName}: <span className="font-bold text-orange-400">{qty} tins</span></p>
@@ -86,7 +90,7 @@ export default function AdminDashboard() {
                 )}
               </div>
             </div>
-          ))}
+          )})}
         </div>
       </div>
     </div>
