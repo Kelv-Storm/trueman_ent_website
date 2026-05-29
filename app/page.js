@@ -1,76 +1,127 @@
 "use client";
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { db } from '../lib/firebase';
-import { collection, addDoc, serverTimestamp } from 'firebase/firestore';
+import { collection, addDoc, serverTimestamp, doc, onSnapshot } from 'firebase/firestore';
 import { jsPDF } from "jspdf";
+
+// 👇 YOUR NEW UPDATED MENU LIST 👇
+const MENU = [
+  { id: 'spicy_dhall', name: 'Spicy Dhall', price: 45 },
+  { id: 'bombay_mixture', name: 'Bombay Spice Mixture', price: 30 },
+  { id: 'kara_bounty', name: 'Kara Bounty', price: 30 },
+  { id: 'pagoda', name: 'Pagoda', price: 35 },
+  { id: 'pepper_kara_sev', name: 'Pepper Kara Sev', price: 30 },
+  { id: 'spicy_banana_chips', name: 'Spicy Banana Chips', price: 45 },
+  { id: 'spicy_mixture', name: 'Spicy Mixture', price: 30 },
+  { id: 'salted_peanuts', name: 'Salted Peanuts', price: 50 },
+  { id: 'green_beans', name: 'Green Beans', price: 45 },
+  { id: 'spicy_tapioca_chips', name: 'Spicy Tapioca Chips', price: 30 }
+];
 
 export default function Storefront() {
   const [customerName, setCustomerName] = useState("");
   const [phone, setPhone] = useState("");
-  const [cart, setCart] = useState({ mixture: 0, omapodi: 0 });
+  const [cart, setCart] = useState({});
   const [isOrdering, setIsOrdering] = useState(false);
+  const [deliveryDate, setDeliveryDate] = useState("Loading...");
 
-  const pricePerTin = 25; // RM25
+  // Fetch the Next Delivery Date from Firebase
+  useEffect(() => {
+    const unsub = onSnapshot(doc(db, "settings", "storeDetails"), (docSnap) => {
+      if (docSnap.exists()) {
+        setDeliveryDate(docSnap.data().deliveryDate);
+      } else {
+        setDeliveryDate("TBA");
+      }
+    });
+    return () => unsub();
+  }, []);
+
+  // Calculate Total Price
+  const totalAmount = MENU.reduce((sum, item) => {
+    return sum + (cart[item.id] || 0) * item.price;
+  }, 0);
+
+  // Handle + and - buttons
+  const updateCart = (itemId, amount) => {
+    setCart(prev => ({
+      ...prev,
+      [itemId]: Math.max(0, (prev[itemId] || 0) + amount)
+    }));
+  };
 
   const handleCheckout = async () => {
     if (!customerName || !phone) return alert("Please enter your name and phone number.");
-    if (cart.mixture === 0 && cart.omapodi === 0) return alert("Please add at least 1 tin.");
+    if (totalAmount === 0) return alert("Please add at least 1 tin to your cart.");
     
     setIsOrdering(true);
-    const totalAmount = (cart.mixture + cart.omapodi) * pricePerTin;
     
+    // Convert cart into a readable format for your dad's dashboard
+    const orderItems = {};
+    MENU.forEach(item => {
+      if (cart[item.id] > 0) orderItems[item.name] = cart[item.id];
+    });
+
     try {
       const docRef = await addDoc(collection(db, "orders"), {
         customer: customerName,
         phone: phone,
-        items: cart,
+        items: orderItems,
         total: totalAmount,
         status: "Pending Payment",
         createdAt: serverTimestamp()
       });
 
-      generateInvoice(docRef.id, totalAmount);
+      generateInvoice(docRef.id, totalAmount, orderItems);
       alert("Order placed! Please check the downloaded PDF for payment details.");
       
-      setCart({ mixture: 0, omapodi: 0 });
+      setCart({});
       setCustomerName("");
       setPhone("");
     } catch (e) {
-      console.error("Error saving order: ", e);
-      alert("Something went wrong. Please try again.");
+      console.error(e);
+      alert("Error saving order: " + e.message); 
     } finally {
       setIsOrdering(false);
     }
   };
 
-  const generateInvoice = (orderId, total) => {
+  const generateInvoice = (orderId, total, items) => {
     const doc = new jsPDF();
     doc.setFontSize(22);
-    doc.text("Murukku Mart - Official Invoice", 20, 20);
+    doc.text("Trueman Enterprise - Official Invoice", 20, 20);
     
     doc.setFontSize(12);
     doc.text(`Order ID: ${orderId}`, 20, 40);
     doc.text(`Customer: ${customerName} (${phone})`, 20, 50);
+    doc.text(`Delivery Date: ${deliveryDate}`, 20, 60);
     
-    doc.text(`Mixture Tins: ${cart.mixture} (RM ${cart.mixture * pricePerTin})`, 20, 70);
-    doc.text(`Omapodi Tins: ${cart.omapodi} (RM ${cart.omapodi * pricePerTin})`, 20, 80);
+    let yPos = 80;
+    Object.entries(items).forEach(([itemName, qty]) => {
+      const itemPrice = MENU.find(m => m.name === itemName).price;
+      doc.text(`${itemName} Tins: ${qty} (RM ${qty * itemPrice})`, 20, yPos);
+      yPos += 10;
+    });
     
     doc.setFontSize(16);
-    doc.text(`Total Due: RM ${total}`, 20, 100);
+    doc.text(`Total Due: RM ${total}`, 20, yPos + 10);
     
-    doc.text("Payment Instructions:", 20, 120);
+    doc.text("Payment Instructions:", 20, yPos + 30);
     doc.setFontSize(12);
-    doc.text("1. Scan DuitNow QR or Transfer to Maybank: 1642-XXXX-XXXX", 20, 130);
-    doc.text(`2. Put Order ID as Reference: ${orderId}`, 20, 140);
-    doc.text("3. WhatsApp receipt to 012-3456789", 20, 150);
+    doc.text("1. Scan DuitNow QR or Transfer to Maybank: 1642-XXXX-XXXX", 20, yPos + 40);
+    doc.text(`2. Put Order ID as Reference: ${orderId}`, 20, yPos + 50);
+    doc.text("3. WhatsApp receipt to 012-3456789", 20, yPos + 60);
     
-    doc.save(`Murukku_Invoice_${orderId}.pdf`);
+    doc.save(`Trueman_Invoice_${orderId}.pdf`);
   };
 
   return (
     <div className="min-h-screen bg-gray-50 p-8 text-black">
       <div className="max-w-md mx-auto bg-white p-6 rounded-xl shadow-md border border-gray-100">
-        <h1 className="text-3xl font-black text-orange-600 mb-6">Deepavali Murukku</h1>
+        <h1 className="text-3xl font-black text-orange-600 mb-2">Trueman Enterprise</h1>
+        <p className="font-bold text-gray-600 mb-6 bg-orange-100 p-2 rounded text-center">
+          Next Delivery: <span className="text-orange-600">{deliveryDate}</span>
+        </p>
         
         <div className="space-y-4 mb-8">
           <input type="text" placeholder="Your Name" value={customerName} onChange={(e) => setCustomerName(e.target.value)} className="w-full border p-3 rounded-lg" />
@@ -78,27 +129,23 @@ export default function Storefront() {
         </div>
         
         <div className="space-y-4 mb-8">
-          <div className="flex justify-between items-center bg-gray-50 p-4 rounded-lg border">
-            <div><h3 className="font-bold">Mixture</h3><p className="text-sm text-gray-500">RM25 / tin</p></div>
-            <div className="flex gap-4 items-center">
-              <button onClick={() => setCart({...cart, mixture: Math.max(0, cart.mixture - 1)})} className="bg-gray-200 w-8 h-8 rounded-full font-bold">-</button>
-              <span className="font-bold w-4 text-center">{cart.mixture}</span>
-              <button onClick={() => setCart({...cart, mixture: cart.mixture + 1})} className="bg-orange-100 text-orange-600 w-8 h-8 rounded-full font-bold">+</button>
+          {MENU.map((item) => (
+            <div key={item.id} className="flex justify-between items-center bg-gray-50 p-4 rounded-lg border">
+              <div>
+                <h3 className="font-bold">{item.name}</h3>
+                <p className="text-sm text-gray-500">RM{item.price} / tin</p>
+              </div>
+              <div className="flex gap-4 items-center">
+                <button onClick={() => updateCart(item.id, -1)} className="bg-gray-200 w-8 h-8 rounded-full font-bold">-</button>
+                <span className="font-bold w-4 text-center">{cart[item.id] || 0}</span>
+                <button onClick={() => updateCart(item.id, 1)} className="bg-orange-100 text-orange-600 w-8 h-8 rounded-full font-bold">+</button>
+              </div>
             </div>
-          </div>
-
-          <div className="flex justify-between items-center bg-gray-50 p-4 rounded-lg border">
-            <div><h3 className="font-bold">Omapodi</h3><p className="text-sm text-gray-500">RM25 / tin</p></div>
-            <div className="flex gap-4 items-center">
-              <button onClick={() => setCart({...cart, omapodi: Math.max(0, cart.omapodi - 1)})} className="bg-gray-200 w-8 h-8 rounded-full font-bold">-</button>
-              <span className="font-bold w-4 text-center">{cart.omapodi}</span>
-              <button onClick={() => setCart({...cart, omapodi: cart.omapodi + 1})} className="bg-orange-100 text-orange-600 w-8 h-8 rounded-full font-bold">+</button>
-            </div>
-          </div>
+          ))}
         </div>
 
-        <button onClick={handleCheckout} disabled={isOrdering} className="w-full bg-orange-500 text-white font-bold py-4 rounded-lg shadow-lg">
-          {isOrdering ? "Generating Order..." : `Checkout (RM ${(cart.mixture + cart.omapodi) * pricePerTin})`}
+        <button onClick={handleCheckout} disabled={isOrdering} className="w-full bg-orange-500 hover:bg-orange-600 text-white font-bold py-4 rounded-lg shadow-lg">
+          {isOrdering ? "Generating Order..." : `Checkout (RM ${totalAmount})`}
         </button>
       </div>
     </div>
