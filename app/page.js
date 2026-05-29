@@ -57,7 +57,6 @@ export default function Storefront() {
       if (cart[item.id] > 0) orderItems[item.name] = cart[item.id];
     });
 
-    // Generate Custom Order ID: Customer_Name_YYYY/MM/DD
     const dateObj = new Date();
     const yyyy = dateObj.getFullYear();
     const mm = String(dateObj.getMonth() + 1).padStart(2, '0');
@@ -67,7 +66,7 @@ export default function Storefront() {
 
     try {
       await addDoc(collection(db, "orders"), {
-        orderId: customOrderId, // Saves the new format to Firebase too!
+        orderId: customOrderId,
         customer: customerName,
         phone: phone,
         items: orderItems,
@@ -76,7 +75,6 @@ export default function Storefront() {
         createdAt: serverTimestamp()
       });
 
-      // Pass the new custom ID to the PDF generator
       generateInvoice(customOrderId, totalAmount, orderItems);
       alert("Order placed! Please check the downloaded PDF for payment details.");
       
@@ -104,12 +102,12 @@ export default function Storefront() {
     let yPos = 80;
     Object.entries(items).forEach(([itemName, qty]) => {
       const itemPrice = MENU.find(m => m.name === itemName).price;
-      doc.text(`${itemName} Tins: ${qty} (RM ${qty * itemPrice})`, 20, yPos);
+      doc.text(`${itemName} Tins: ${qty} ($${qty * itemPrice})`, 20, yPos);
       yPos += 10;
     });
     
     doc.setFontSize(16);
-    doc.text(`Total Due: RM ${total}`, 20, yPos + 10);
+    doc.text(`Total Due: $${total}`, 20, yPos + 10);
     
     doc.text("Payment Instructions:", 20, yPos + 30);
     doc.setFontSize(12);
@@ -117,7 +115,6 @@ export default function Storefront() {
     doc.text("2. Put Order ID as Reference", 20, yPos + 50);
     doc.text("3. WhatsApp receipt to +65 9816 4292 (Logan)", 20, yPos + 60);
     
-    // Replace slashes with dashes for the filename so it saves safely
     const safeFilename = orderId.replace(/\//g, '-');
     doc.save(`Trueman_Invoice_${safeFilename}.pdf`);
   };
@@ -140,7 +137,7 @@ export default function Storefront() {
             <div key={item.id} className="flex justify-between items-center bg-gray-50 p-4 rounded-lg border">
               <div>
                 <h3 className="font-bold">{item.name}</h3>
-                <p className="text-sm text-gray-500">RM{item.price} / tin</p>
+                <p className="text-sm text-gray-500">${item.price} / tin</p>
               </div>
               <div className="flex gap-4 items-center">
                 <button onClick={() => updateCart(item.id, -1)} className="bg-gray-200 w-8 h-8 rounded-full font-bold">-</button>
@@ -152,7 +149,7 @@ export default function Storefront() {
         </div>
 
         <button onClick={handleCheckout} disabled={isOrdering} className="w-full bg-orange-500 hover:bg-orange-600 text-white font-bold py-4 rounded-lg shadow-lg">
-          {isOrdering ? "Generating Order..." : `Checkout (RM ${totalAmount})`}
+          {isOrdering ? "Generating Order..." : `Checkout ($${totalAmount})`}
         </button>
       </div>
     </div>
