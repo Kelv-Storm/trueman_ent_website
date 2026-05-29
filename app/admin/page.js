@@ -86,7 +86,6 @@ export default function AdminDashboard() {
     docPdf.setFontSize(12);
     docPdf.text(`Order ID: ${orderIdToPrint}`, 20, 40);
     docPdf.text(`Customer: ${order.customer} (${order.phone})`, 20, 50);
-    // Use the order's saved delivery date if available, otherwise fallback
     docPdf.text(`Delivery Date: ${order.deliveryDate || currentDate}`, 20, 60);
     
     let yPos = 80;
@@ -117,8 +116,13 @@ export default function AdminDashboard() {
 
   // Group Orders By Delivery Date
   const groupedOrders = orders.reduce((groups, order) => {
-    // If order was placed before this update, categorize as "Previous/Unknown Date"
-    const groupDate = order.deliveryDate || "Previous/Unknown Date"; 
+    // Fallback: If it's an old order without a delivery date, use the date it was placed
+    const fallbackDate = order.createdAt?.toDate 
+      ? order.createdAt.toDate().toLocaleDateString('en-GB') 
+      : "Unknown Date"; 
+      
+    const groupDate = order.deliveryDate || fallbackDate; 
+    
     if (!groups[groupDate]) {
       groups[groupDate] = [];
     }
@@ -129,7 +133,6 @@ export default function AdminDashboard() {
   const generateSummaryPDF = (dateGroup, groupOrders) => {
     const summaryData = {};
     
-    // Calculate total quantities of each item
     groupOrders.forEach(order => {
       if (order.items) {
         Object.entries(order.items).forEach(([itemName, qty]) => {
@@ -153,7 +156,6 @@ export default function AdminDashboard() {
     if (Object.keys(summaryData).length === 0) {
       docPdf.text("No items ordered for this date yet.", 20, yPos);
     } else {
-      // Sort alphabetically for a cleaner kitchen list
       Object.entries(summaryData).sort().forEach(([itemName, totalQty]) => {
         docPdf.text(`${itemName}:`, 20, yPos);
         docPdf.setFont("helvetica", "bold");
@@ -205,11 +207,9 @@ export default function AdminDashboard() {
           </button>
         </div>
         
-        {/* RENDER GROUPED ORDERS */}
         {Object.entries(groupedOrders).map(([dateGroup, groupOrders]) => (
           <div key={dateGroup} className="mb-12">
             
-            {/* GROUP HEADER & SUMMARISE BUTTON */}
             <div className="flex justify-between items-center mb-6 border-b border-slate-700 pb-2">
               <h2 className="text-2xl font-bold text-orange-400">{dateGroup}</h2>
               <button 
