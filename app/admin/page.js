@@ -1,7 +1,7 @@
 "use client";
 import { useEffect, useState } from 'react';
 import { db, auth } from '../../lib/firebase';
-import { collection, query, orderBy, onSnapshot, doc, updateDoc, setDoc } from 'firebase/firestore';
+import { collection, query, orderBy, onSnapshot, doc, updateDoc, setDoc, deleteDoc } from 'firebase/firestore';
 import { signInWithEmailAndPassword, onAuthStateChanged, signOut } from 'firebase/auth';
 import { jsPDF } from "jspdf";
 
@@ -12,7 +12,6 @@ const MENU = [
   { id: 'pagoda', name: 'Pagoda', price: 35 },
   { id: 'pepper_kara_sev', name: 'Pepper Kara Sev', price: 30 },
   { id: 'spicy_banana_chips', name: 'Spicy Banana Chips', price: 45 },
-  { id: 'spicy_mixture', name: 'Spicy Mixture', price: 30 },
   { id: 'salted_peanuts', name: 'Salted Peanuts', price: 50 },
   { id: 'green_beans', name: 'Green Beans', price: 45 },
   { id: 'spicy_tapioca_chips', name: 'Spicy Tapioca Chips', price: 30 }
@@ -27,7 +26,6 @@ export default function AdminDashboard() {
   const [dateInput, setDateInput] = useState("");
   const [currentDate, setCurrentDate] = useState("Loading...");
 
-  // Check if dad is logged in
   useEffect(() => {
     const unsubAuth = onAuthStateChanged(auth, (currentUser) => {
       setUser(currentUser);
@@ -35,19 +33,15 @@ export default function AdminDashboard() {
     return () => unsubAuth();
   }, []);
 
-  // Only load orders if he IS logged in
   useEffect(() => {
-    if (!user) return; // Stop if not logged in
-
+    if (!user) return;
     const q = query(collection(db, "orders"), orderBy("createdAt", "desc"));
     const unsubOrders = onSnapshot(q, (snapshot) => {
       setOrders(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
     });
-
     const unsubDate = onSnapshot(doc(db, "settings", "storeDetails"), (docSnap) => {
       if (docSnap.exists()) setCurrentDate(docSnap.data().deliveryDate);
     });
-
     return () => { unsubOrders(); unsubDate(); };
   }, [user]);
 
@@ -68,6 +62,13 @@ export default function AdminDashboard() {
     await updateDoc(doc(db, "orders", orderId), { status: "Paid & Preparing" });
   };
 
+  const deleteOrder = async (orderId) => {
+    const isConfirmed = window.confirm("Are you sure you want to delete this order? This cannot be undone.");
+    if (isConfirmed) {
+      await deleteDoc(doc(db, "orders", orderId));
+    }
+  };
+
   const saveDeliveryDate = async () => {
     if (!dateInput) return;
     await setDoc(doc(db, "settings", "storeDetails"), { deliveryDate: dateInput }, { merge: true });
@@ -85,7 +86,8 @@ export default function AdminDashboard() {
     docPdf.setFontSize(12);
     docPdf.text(`Order ID: ${orderIdToPrint}`, 20, 40);
     docPdf.text(`Customer: ${order.customer} (${order.phone})`, 20, 50);
-    docPdf.text(`Delivery Date: ${currentDate}`, 20, 60);
+    // Use the order's saved delivery date if available, otherwise fallback
+    docPdf.text(`Delivery Date: ${order.deliveryDate || currentDate}`, 20, 60);
     
     let yPos = 80;
     if (order.items) {
@@ -101,8 +103,11 @@ export default function AdminDashboard() {
     docPdf.text(`Total Due: $${order.total}`, 20, yPos + 10);
     
     docPdf.text("Payment Instructions:", 20, yPos + 30);
+    
     docPdf.setFontSize(12);
-    docPdf.text("1. Transfer to Maybank Singapore: 04071077653 (Trueman Enterprise)", 20, yPos + 40);
+    docPdf.setFont("helvetica", "bold");
+    docPdf.text("1. Paynow UEN 53330872X Trueman Enterprise", 20, yPos + 40);
+    docPdf.setFont("helvetica", "normal");
     docPdf.text("2. Put Order ID as Reference", 20, yPos + 50);
     docPdf.text("3. WhatsApp receipt to +65 9816 4292 (Logan)", 20, yPos + 60);
     
@@ -110,7 +115,58 @@ export default function AdminDashboard() {
     docPdf.save(`Trueman_Invoice_${safeFilename}.pdf`);
   };
 
-  // IF NOT LOGGED IN: SHOW LOGIN SCREEN
+  // Group Orders By Delivery Date
+  const groupedOrders = orders.reduce((groups, order) => {
+    // If order was placed before this update, categorize as "Previous/Unknown Date"
+    const groupDate = order.deliveryDate || "Previous/Unknown Date"; 
+    if (!groups[groupDate]) {
+      groups[groupDate] = [];
+    }
+    groups[groupDate].push(order);
+    return groups;
+  }, {});
+
+  const generateSummaryPDF = (dateGroup, groupOrders) => {
+    const summaryData = {};
+    
+    // Calculate total quantities of each item
+    groupOrders.forEach(order => {
+      if (order.items) {
+        Object.entries(order.items).forEach(([itemName, qty]) => {
+          summaryData[itemName] = (summaryData[itemName] || 0) + qty;
+        });
+      }
+    });
+
+    const docPdf = new jsPDF();
+    docPdf.setFontSize(22);
+    docPdf.setFont("helvetica", "bold");
+    docPdf.text(`Production Summary`, 20, 20);
+    
+    docPdf.setFontSize(14);
+    docPdf.setFont("helvetica", "normal");
+    docPdf.text(`Delivery Date: ${dateGroup}`, 20, 30);
+    
+    let yPos = 50;
+    docPdf.setFontSize(14);
+    
+    if (Object.keys(summaryData).length === 0) {
+      docPdf.text("No items ordered for this date yet.", 20, yPos);
+    } else {
+      // Sort alphabetically for a cleaner kitchen list
+      Object.entries(summaryData).sort().forEach(([itemName, totalQty]) => {
+        docPdf.text(`${itemName}:`, 20, yPos);
+        docPdf.setFont("helvetica", "bold");
+        docPdf.text(`${totalQty} tins`, 100, yPos);
+        docPdf.setFont("helvetica", "normal");
+        yPos += 10;
+      });
+    }
+
+    const safeDateName = dateGroup.replace(/[\/\s,]+/g, '_');
+    docPdf.save(`Trueman_Summary_${safeDateName}.pdf`);
+  };
+
   if (!user) {
     return (
       <div className="min-h-screen bg-slate-900 flex items-center justify-center p-8 text-white">
@@ -124,7 +180,6 @@ export default function AdminDashboard() {
     );
   }
 
-  // IF LOGGED IN: SHOW DASHBOARD
   return (
     <div className="min-h-screen bg-slate-900 p-8 text-white">
       <div className="max-w-4xl mx-auto">
@@ -150,48 +205,69 @@ export default function AdminDashboard() {
           </button>
         </div>
         
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          {orders.map(order => {
-            const orderDate = order.createdAt?.toDate 
-              ? order.createdAt.toDate().toLocaleDateString('en-GB') 
-              : "Just now";
-
-            return (
-            <div key={order.id} className="bg-slate-800 p-6 rounded-xl border border-slate-700 shadow-xl flex flex-col justify-between">
-              <div>
-                <div className="flex justify-between items-start mb-4">
-                  <div>
-                    <h3 className="font-bold text-lg">{order.customer}</h3>
-                    <p className="text-sm text-slate-400">{order.phone} &bull; {orderDate}</p>
-                  </div>
-                  <span className={`px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider ${order.status === "Pending Payment" ? "bg-yellow-500/20 text-yellow-400" : "bg-emerald-500/20 text-emerald-400"}`}>
-                    {order.status}
-                  </span>
-                </div>
-                
-                <div className="bg-slate-900/50 p-4 rounded-lg mb-4 text-sm">
-                  {order.items && Object.entries(order.items).map(([itemName, qty]) => (
-                    <p key={itemName}>{itemName}: <span className="font-bold text-orange-400">{qty} tins</span></p>
-                  ))}
-                </div>
-              </div>
-              
-              <div className="flex justify-between items-center mt-2 border-t border-slate-700 pt-4">
-                <p className="font-black text-xl">$ {order.total}</p>
-                <div className="flex gap-2">
-                  <button onClick={() => downloadInvoice(order)} className="bg-slate-700 hover:bg-slate-600 text-white font-bold px-3 py-2 rounded-lg text-sm transition-colors">
-                    Download PDF 📥
-                  </button>
-                  {order.status === "Pending Payment" && (
-                    <button onClick={() => markAsPaid(order.id)} className="bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold px-3 py-2 rounded-lg text-sm transition-colors">
-                      Verify
-                    </button>
-                  )}
-                </div>
-              </div>
+        {/* RENDER GROUPED ORDERS */}
+        {Object.entries(groupedOrders).map(([dateGroup, groupOrders]) => (
+          <div key={dateGroup} className="mb-12">
+            
+            {/* GROUP HEADER & SUMMARISE BUTTON */}
+            <div className="flex justify-between items-center mb-6 border-b border-slate-700 pb-2">
+              <h2 className="text-2xl font-bold text-orange-400">{dateGroup}</h2>
+              <button 
+                onClick={() => generateSummaryPDF(dateGroup, groupOrders)} 
+                className="bg-blue-600 hover:bg-blue-500 text-white font-bold px-4 py-2 rounded-lg text-sm transition-colors flex items-center gap-2"
+              >
+                Summarise 📊
+              </button>
             </div>
-          )})}
-        </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {groupOrders.map(order => {
+                const orderDate = order.createdAt?.toDate 
+                  ? order.createdAt.toDate().toLocaleDateString('en-GB') 
+                  : "Just now";
+
+                return (
+                <div key={order.id} className="bg-slate-800 p-6 rounded-xl border border-slate-700 shadow-xl flex flex-col justify-between">
+                  <div>
+                    <div className="flex justify-between items-start mb-4">
+                      <div>
+                        <h3 className="font-bold text-lg">{order.customer}</h3>
+                        <p className="text-sm text-slate-400">{order.phone} &bull; {orderDate}</p>
+                      </div>
+                      <span className={`px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider ${order.status === "Pending Payment" ? "bg-yellow-500/20 text-yellow-400" : "bg-emerald-500/20 text-emerald-400"}`}>
+                        {order.status}
+                      </span>
+                    </div>
+                    
+                    <div className="bg-slate-900/50 p-4 rounded-lg mb-4 text-sm">
+                      {order.items && Object.entries(order.items).map(([itemName, qty]) => (
+                        <p key={itemName}>{itemName}: <span className="font-bold text-orange-400">{qty} tins</span></p>
+                      ))}
+                    </div>
+                  </div>
+                  
+                  <div className="flex justify-between items-center mt-2 border-t border-slate-700 pt-4">
+                    <p className="font-black text-xl">$ {order.total}</p>
+                    <div className="flex gap-2">
+                      <button onClick={() => deleteOrder(order.id)} className="bg-red-500/10 hover:bg-red-500/20 text-red-500 font-bold px-3 py-2 rounded-lg text-sm transition-colors border border-red-500/30">
+                        Delete
+                      </button>
+                      <button onClick={() => downloadInvoice(order)} className="bg-slate-700 hover:bg-slate-600 text-white font-bold px-3 py-2 rounded-lg text-sm transition-colors">
+                        Get PDF
+                      </button>
+                      {order.status === "Pending Payment" && (
+                        <button onClick={() => markAsPaid(order.id)} className="bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold px-3 py-2 rounded-lg text-sm transition-colors">
+                          Verify
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              )})}
+            </div>
+          </div>
+        ))}
+
       </div>
     </div>
   );
