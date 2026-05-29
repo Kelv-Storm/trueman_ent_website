@@ -1,8 +1,9 @@
 "use client";
 import { useEffect, useState } from 'react';
-import { db } from '../../lib/firebase';
+import { db, auth } from '../../lib/firebase';
 import { collection, query, orderBy, onSnapshot, doc, updateDoc, setDoc } from 'firebase/firestore';
-import { jsPDF } from "jspdf"; // Implemented PDF generation for Admin
+import { signInWithEmailAndPassword, onAuthStateChanged, signOut } from 'firebase/auth';
+import { jsPDF } from "jspdf";
 
 const MENU = [
   { id: 'spicy_dhall', name: 'Spicy Dhall', price: 45 },
@@ -18,11 +19,26 @@ const MENU = [
 ];
 
 export default function AdminDashboard() {
+  const [user, setUser] = useState(null);
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  
   const [orders, setOrders] = useState([]);
   const [dateInput, setDateInput] = useState("");
   const [currentDate, setCurrentDate] = useState("Loading...");
 
+  // Check if dad is logged in
   useEffect(() => {
+    const unsubAuth = onAuthStateChanged(auth, (currentUser) => {
+      setUser(currentUser);
+    });
+    return () => unsubAuth();
+  }, []);
+
+  // Only load orders if he IS logged in
+  useEffect(() => {
+    if (!user) return; // Stop if not logged in
+
     const q = query(collection(db, "orders"), orderBy("createdAt", "desc"));
     const unsubOrders = onSnapshot(q, (snapshot) => {
       setOrders(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
@@ -33,7 +49,20 @@ export default function AdminDashboard() {
     });
 
     return () => { unsubOrders(); unsubDate(); };
-  }, []);
+  }, [user]);
+
+  const handleLogin = async (e) => {
+    e.preventDefault();
+    try {
+      await signInWithEmailAndPassword(auth, email, password);
+    } catch (err) {
+      alert("Incorrect email or password.");
+    }
+  };
+
+  const handleLogout = async () => {
+    await signOut(auth);
+  };
 
   const markAsPaid = async (orderId) => {
     await updateDoc(doc(db, "orders", orderId), { status: "Paid & Preparing" });
@@ -46,10 +75,9 @@ export default function AdminDashboard() {
     alert("Delivery date updated successfully!");
   };
 
-  // Recreate the PDF for your Dad
   const downloadInvoice = (order) => {
     const docPdf = new jsPDF();
-    const orderIdToPrint = order.orderId || order.id; // Uses formatted ID if it exists
+    const orderIdToPrint = order.orderId || order.id;
 
     docPdf.setFontSize(22);
     docPdf.text("Trueman Enterprise - Official Invoice", 20, 20);
@@ -57,7 +85,7 @@ export default function AdminDashboard() {
     docPdf.setFontSize(12);
     docPdf.text(`Order ID: ${orderIdToPrint}`, 20, 40);
     docPdf.text(`Customer: ${order.customer} (${order.phone})`, 20, 50);
-    docPdf.text(`Delivery Date: ${currentDate}`, 20, 60); // Uses current active delivery date
+    docPdf.text(`Delivery Date: ${currentDate}`, 20, 60);
     
     let yPos = 80;
     if (order.items) {
@@ -82,10 +110,28 @@ export default function AdminDashboard() {
     docPdf.save(`Trueman_Invoice_${safeFilename}.pdf`);
   };
 
+  // IF NOT LOGGED IN: SHOW LOGIN SCREEN
+  if (!user) {
+    return (
+      <div className="min-h-screen bg-slate-900 flex items-center justify-center p-8 text-white">
+        <form onSubmit={handleLogin} className="bg-slate-800 p-8 rounded-xl shadow-xl max-w-sm w-full border border-slate-700">
+          <h1 className="text-2xl font-black text-orange-500 mb-6 text-center">Admin Login</h1>
+          <input type="email" placeholder="Email" value={email} onChange={(e) => setEmail(e.target.value)} className="w-full bg-slate-900 border border-slate-600 p-3 rounded-lg mb-4" required />
+          <input type="password" placeholder="Password" value={password} onChange={(e) => setPassword(e.target.value)} className="w-full bg-slate-900 border border-slate-600 p-3 rounded-lg mb-6" required />
+          <button type="submit" className="w-full bg-orange-500 hover:bg-orange-600 text-white font-bold py-3 rounded-lg">Login</button>
+        </form>
+      </div>
+    );
+  }
+
+  // IF LOGGED IN: SHOW DASHBOARD
   return (
     <div className="min-h-screen bg-slate-900 p-8 text-white">
       <div className="max-w-4xl mx-auto">
-        <h1 className="text-3xl font-black text-orange-500 mb-6">Trueman Admin Dashboard</h1>
+        <div className="flex justify-between items-center mb-6">
+          <h1 className="text-3xl font-black text-orange-500">Trueman Admin</h1>
+          <button onClick={handleLogout} className="text-slate-400 hover:text-white text-sm underline">Logout</button>
+        </div>
         
         <div className="bg-slate-800 p-6 rounded-xl border border-slate-700 shadow-xl mb-8 flex items-end gap-4">
           <div className="flex-1">
@@ -116,9 +162,7 @@ export default function AdminDashboard() {
                 <div className="flex justify-between items-start mb-4">
                   <div>
                     <h3 className="font-bold text-lg">{order.customer}</h3>
-                    <p className="text-sm text-slate-400">
-                      {order.phone} &bull; {orderDate}
-                    </p>
+                    <p className="text-sm text-slate-400">{order.phone} &bull; {orderDate}</p>
                   </div>
                   <span className={`px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider ${order.status === "Pending Payment" ? "bg-yellow-500/20 text-yellow-400" : "bg-emerald-500/20 text-emerald-400"}`}>
                     {order.status}
@@ -136,7 +180,7 @@ export default function AdminDashboard() {
                 <p className="font-black text-xl">$ {order.total}</p>
                 <div className="flex gap-2">
                   <button onClick={() => downloadInvoice(order)} className="bg-slate-700 hover:bg-slate-600 text-white font-bold px-3 py-2 rounded-lg text-sm transition-colors">
-                    Get PDF
+                    Download PDF 📥
                   </button>
                   {order.status === "Pending Payment" && (
                     <button onClick={() => markAsPaid(order.id)} className="bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold px-3 py-2 rounded-lg text-sm transition-colors">
