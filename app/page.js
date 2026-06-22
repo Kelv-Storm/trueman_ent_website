@@ -10,7 +10,7 @@ const MENU = [
   { id: 'kara_bounty', name: 'Kara Bounty', price: 30, image: '/kara_bounty.jpg' },
   { id: 'pagoda', name: 'Pagoda', price: 35, image: '/pagoda.jpg' },
   { id: 'pepper_kara_sev', name: 'Pepper Kara Sev', price: 30, image: '/pepper_kara_sev.jpg' },
-  { id: 'spicy_banana_chips', name: 'Spicy Banana Chips', price: 45, image: '/spicy_banana_chips.jpg' },
+  { id: 'spicy_banana_chips', name: 'Spicy Banana Chips', price: 50, image: '/spicy_banana_chips.jpg' },
   { id: 'salted_peanuts', name: 'Salted Peanuts', price: 50, image: '/salted_peanuts.jpg' },
   { id: 'green_beans', name: 'Green Beans', price: 45, image: '/green_beans.jpg' },
   { id: 'spicy_tapioca_chips', name: 'Spicy Tapioca Chips', price: 30, image: '/spicy_tapioca_chips.jpg' }
@@ -107,11 +107,9 @@ export default function Storefront() {
     doc.text(`Store: ${storeName}`, 20, 60);
     doc.text(`Phone: ${phone}`, 20, 70);
     
-    // Split address across multiple lines if it's too long
     const splitAddress = doc.splitTextToSize(`Address: ${address}`, 170);
     doc.text(splitAddress, 20, 80);
     
-    // Dynamically push the next text down based on address length
     let yPos = 80 + (splitAddress.length * 7) + 5;
     doc.text(`Delivery Date: ${deliveryDate}`, 20, yPos);
     
