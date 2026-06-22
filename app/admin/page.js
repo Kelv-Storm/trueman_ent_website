@@ -1,17 +1,3 @@
-That makes perfect sense! If he is sending a document to the manufacturers, they definitely do not need to see the prices, revenue, or which customer ordered what. Keeping it strictly to quantities is the professional way to do it.
-
-I have split the "Total Sum Summary" into two separate buttons on the dashboard:
-
-1. **Kitchen Summary 👨‍🍳:** Generates a clean, simple PDF showing ONLY the item names and total quantities needed for the manufacturer.
-2. **Customer Breakdown 🧾:** Generates the detailed PDF for your dad's personal records, showing every customer, what they ordered, their individual total, and the week's grand total revenue.
-
-Since this only affects the admin dashboard, you **only** need to update your `admin/page.js` file!
-
-### The Final Admin Dashboard (`src/app/admin/page.js`)
-
-Replace everything in your **`src/app/admin/page.js`** file with this:
-
-```javascript
 "use client";
 import { useEffect, useState } from 'react';
 import { db, auth } from '../../lib/firebase';
@@ -368,7 +354,3 @@ export default function AdminDashboard() {
     </div>
   );
 }
-
-```
-
-Run your final `git add .`, `git commit -m "split PDFs into kitchen and customer records"`, and `git push`. Your dad is going to have the most organized operation in town!
