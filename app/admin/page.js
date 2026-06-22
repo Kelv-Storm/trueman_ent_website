@@ -11,7 +11,7 @@ const MENU = [
   { id: 'kara_bounty', name: 'Kara Bounty', price: 30 },
   { id: 'pagoda', name: 'Pagoda', price: 35 },
   { id: 'pepper_kara_sev', name: 'Pepper Kara Sev', price: 30 },
-  { id: 'spicy_banana_chips', name: 'Spicy Banana Chips', price: 45 },
+  { id: 'spicy_banana_chips', name: 'Spicy Banana Chips', price: 50 },
   { id: 'salted_peanuts', name: 'Salted Peanuts', price: 50 },
   { id: 'green_beans', name: 'Green Beans', price: 45 },
   { id: 'spicy_tapioca_chips', name: 'Spicy Tapioca Chips', price: 30 }
