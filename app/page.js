@@ -18,7 +18,10 @@ const MENU = [
 
 export default function Storefront() {
   const [customerName, setCustomerName] = useState("");
+  const [storeName, setStoreName] = useState("");
   const [phone, setPhone] = useState("");
+  const [address, setAddress] = useState("");
+  
   const [cart, setCart] = useState({});
   const [isOrdering, setIsOrdering] = useState(false);
   const [deliveryDate, setDeliveryDate] = useState("Loading...");
@@ -46,7 +49,7 @@ export default function Storefront() {
   };
 
   const handleCheckout = async () => {
-    if (!customerName || !phone) return alert("Please enter your name and phone number.");
+    if (!customerName || !storeName || !phone || !address) return alert("Please fill in all your details (Name, Store, Phone, and Address).");
     if (totalAmount === 0) return alert("Please add at least 1 tin to your cart.");
     
     setIsOrdering(true);
@@ -67,11 +70,13 @@ export default function Storefront() {
       await addDoc(collection(db, "orders"), {
         orderId: customOrderId,
         customer: customerName,
+        storeName: storeName,
         phone: phone,
+        address: address,
         items: orderItems,
         total: totalAmount,
         status: "Pending Payment",
-        deliveryDate: deliveryDate, // <-- NOW SAVES THE DELIVERY DATE TO THE ORDER
+        deliveryDate: deliveryDate,
         createdAt: serverTimestamp()
       });
 
@@ -80,7 +85,9 @@ export default function Storefront() {
       
       setCart({});
       setCustomerName("");
+      setStoreName("");
       setPhone("");
+      setAddress("");
     } catch (e) {
       console.error(e);
       alert("Error saving order: " + e.message); 
@@ -96,10 +103,19 @@ export default function Storefront() {
     
     doc.setFontSize(12);
     doc.text(`Order ID: ${orderId}`, 20, 40);
-    doc.text(`Customer: ${customerName} (${phone})`, 20, 50);
-    doc.text(`Delivery Date: ${deliveryDate}`, 20, 60);
+    doc.text(`Customer: ${customerName}`, 20, 50);
+    doc.text(`Store: ${storeName}`, 20, 60);
+    doc.text(`Phone: ${phone}`, 20, 70);
     
-    let yPos = 80;
+    // Split address across multiple lines if it's too long
+    const splitAddress = doc.splitTextToSize(`Address: ${address}`, 170);
+    doc.text(splitAddress, 20, 80);
+    
+    // Dynamically push the next text down based on address length
+    let yPos = 80 + (splitAddress.length * 7) + 5;
+    doc.text(`Delivery Date: ${deliveryDate}`, 20, yPos);
+    
+    yPos += 20;
     Object.entries(items).forEach(([itemName, qty]) => {
       const itemPrice = MENU.find(m => m.name === itemName)?.price || 0;
       doc.text(`${itemName} Tins: ${qty} ($${qty * itemPrice})`, 20, yPos);
@@ -112,12 +128,8 @@ export default function Storefront() {
     doc.text("Payment Instructions:", 20, yPos + 30);
     
     doc.setFontSize(12);
-    
-    // Bolded PayNow line
     doc.setFont("helvetica", "bold");
     doc.text("1. Paynow UEN 53330872X Trueman Enterprise", 20, yPos + 40);
-    
-    // Switch back to normal font for the rest
     doc.setFont("helvetica", "normal");
     doc.text("2. Put Order ID as Reference", 20, yPos + 50);
     doc.text("3. WhatsApp receipt to +65 9816 4292 (Logan)", 20, yPos + 60);
@@ -136,7 +148,9 @@ export default function Storefront() {
         
         <div className="space-y-4 mb-8">
           <input type="text" placeholder="Your Name" value={customerName} onChange={(e) => setCustomerName(e.target.value)} className="w-full border p-3 rounded-lg focus:outline-orange-500 focus:ring-1 focus:ring-orange-500" />
+          <input type="text" placeholder="Store Name" value={storeName} onChange={(e) => setStoreName(e.target.value)} className="w-full border p-3 rounded-lg focus:outline-orange-500 focus:ring-1 focus:ring-orange-500" />
           <input type="tel" placeholder="Phone Number" value={phone} onChange={(e) => setPhone(e.target.value)} className="w-full border p-3 rounded-lg focus:outline-orange-500 focus:ring-1 focus:ring-orange-500" />
+          <textarea placeholder="Delivery Address" value={address} onChange={(e) => setAddress(e.target.value)} rows="3" className="w-full border p-3 rounded-lg focus:outline-orange-500 focus:ring-1 focus:ring-orange-500 resize-none" />
         </div>
         
         <div className="space-y-4 mb-8">
