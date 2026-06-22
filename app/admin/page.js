@@ -76,6 +76,7 @@ export default function AdminDashboard() {
     alert("Delivery date updated successfully!");
   };
 
+  // Individual Order PDF (For Dad's Records if needed)
   const downloadInvoice = (order) => {
     const docPdf = new jsPDF();
     const orderIdToPrint = order.orderId || order.id;
@@ -85,10 +86,17 @@ export default function AdminDashboard() {
     
     docPdf.setFontSize(12);
     docPdf.text(`Order ID: ${orderIdToPrint}`, 20, 40);
-    docPdf.text(`Customer: ${order.customer} (${order.phone})`, 20, 50);
-    docPdf.text(`Delivery Date: ${order.deliveryDate || currentDate}`, 20, 60);
+    docPdf.text(`Customer: ${order.customer}`, 20, 50);
+    docPdf.text(`Store: ${order.storeName || "N/A"}`, 20, 60);
+    docPdf.text(`Phone: ${order.phone}`, 20, 70);
     
-    let yPos = 80;
+    const splitAddress = docPdf.splitTextToSize(`Address: ${order.address || "N/A"}`, 170);
+    docPdf.text(splitAddress, 20, 80);
+    
+    let yPos = 80 + (splitAddress.length * 7) + 5;
+    docPdf.text(`Delivery Date: ${order.deliveryDate || currentDate}`, 20, yPos);
+    
+    yPos += 20;
     if (order.items) {
       Object.entries(order.items).forEach(([itemName, qty]) => {
         const menuObj = MENU.find(m => m.name === itemName);
@@ -102,7 +110,6 @@ export default function AdminDashboard() {
     docPdf.text(`Total Due: $${order.total}`, 20, yPos + 10);
     
     docPdf.text("Payment Instructions:", 20, yPos + 30);
-    
     docPdf.setFontSize(12);
     docPdf.setFont("helvetica", "bold");
     docPdf.text("1. Paynow UEN 53330872X Trueman Enterprise", 20, yPos + 40);
@@ -114,13 +121,8 @@ export default function AdminDashboard() {
     docPdf.save(`Trueman_Invoice_${safeFilename}.pdf`);
   };
 
-  // Group Orders By Delivery Date
   const groupedOrders = orders.reduce((groups, order) => {
-    // Fallback: If it's an old order without a delivery date, use the date it was placed
-    const fallbackDate = order.createdAt?.toDate 
-      ? order.createdAt.toDate().toLocaleDateString('en-GB') 
-      : "Unknown Date"; 
-      
+    const fallbackDate = order.createdAt?.toDate ? order.createdAt.toDate().toLocaleDateString('en-GB') : "Unknown Date"; 
     const groupDate = order.deliveryDate || fallbackDate; 
     
     if (!groups[groupDate]) {
@@ -130,10 +132,40 @@ export default function AdminDashboard() {
     return groups;
   }, {});
 
-  const generateSummaryPDF = (dateGroup, groupOrders) => {
-    const summaryData = {};
+  // NEW: The Master "Total Sum Summary" PDF Generator
+  const generateTotalSumSummaryPDF = (dateGroup, groupOrders) => {
+    const docPdf = new jsPDF();
+    let yPos = 20;
+
+    // Helper to add pages if list gets too long
+    const checkPageBreak = (neededHeight) => {
+      if (yPos + neededHeight > 280) {
+        docPdf.addPage();
+        yPos = 20;
+      }
+    };
+
+    docPdf.setFontSize(22);
+    docPdf.setFont("helvetica", "bold");
+    docPdf.text(`Total Sum Summary`, 20, yPos);
+    yPos += 10;
     
+    docPdf.setFontSize(14);
+    docPdf.setFont("helvetica", "normal");
+    docPdf.text(`Delivery Date: ${dateGroup}`, 20, yPos);
+    yPos += 15;
+
+    // --- SECTION 1: KITCHEN QUANTITIES ---
+    docPdf.setFontSize(16);
+    docPdf.setFont("helvetica", "bold");
+    docPdf.text("1. Kitchen Item Summary", 20, yPos);
+    yPos += 10;
+
+    const summaryData = {};
+    let grandTotal = 0;
+
     groupOrders.forEach(order => {
+      grandTotal += (order.total || 0);
       if (order.items) {
         Object.entries(order.items).forEach(([itemName, qty]) => {
           summaryData[itemName] = (summaryData[itemName] || 0) + qty;
@@ -141,32 +173,66 @@ export default function AdminDashboard() {
       }
     });
 
-    const docPdf = new jsPDF();
-    docPdf.setFontSize(22);
-    docPdf.setFont("helvetica", "bold");
-    docPdf.text(`Production Summary`, 20, 20);
-    
-    docPdf.setFontSize(14);
+    docPdf.setFontSize(12);
     docPdf.setFont("helvetica", "normal");
-    docPdf.text(`Delivery Date: ${dateGroup}`, 20, 30);
-    
-    let yPos = 50;
-    docPdf.setFontSize(14);
-    
     if (Object.keys(summaryData).length === 0) {
-      docPdf.text("No items ordered for this date yet.", 20, yPos);
+      docPdf.text("No items ordered.", 20, yPos);
+      yPos += 10;
     } else {
       Object.entries(summaryData).sort().forEach(([itemName, totalQty]) => {
+        checkPageBreak(10);
         docPdf.text(`${itemName}:`, 20, yPos);
         docPdf.setFont("helvetica", "bold");
         docPdf.text(`${totalQty} tins`, 100, yPos);
         docPdf.setFont("helvetica", "normal");
-        yPos += 10;
+        yPos += 8;
       });
     }
+    yPos += 10;
+
+    // --- SECTION 2: CUSTOMER BREAKDOWN ---
+    checkPageBreak(20);
+    docPdf.setFontSize(16);
+    docPdf.setFont("helvetica", "bold");
+    docPdf.text("2. Customer Breakdown", 20, yPos);
+    yPos += 10;
+
+    groupOrders.forEach(order => {
+      checkPageBreak(25);
+      
+      // Customer Name & Store
+      docPdf.setFontSize(12);
+      docPdf.setFont("helvetica", "bold");
+      const storeLabel = order.storeName ? `(${order.storeName})` : "";
+      docPdf.text(`${order.customer} ${storeLabel}`, 20, yPos);
+      
+      // Customer Total Price
+      docPdf.text(`$${order.total}`, 170, yPos);
+      yPos += 6;
+      
+      // Customer's specific items
+      let itemString = Object.entries(order.items || {}).map(([k, v]) => `${v}x ${k}`).join(', ');
+      docPdf.setFontSize(10);
+      docPdf.setFont("helvetica", "normal");
+      docPdf.setTextColor(100); // Gray text
+      
+      // Split items text if they ordered a massive variety
+      const splitItems = docPdf.splitTextToSize(itemString, 170);
+      docPdf.text(splitItems, 20, yPos);
+      yPos += (splitItems.length * 5) + 6;
+      docPdf.setTextColor(0); // Back to black
+    });
+
+    yPos += 10;
+
+    // --- SECTION 3: GRAND TOTAL ---
+    checkPageBreak(20);
+    docPdf.setFontSize(18);
+    docPdf.setFont("helvetica", "bold");
+    docPdf.text(`Grand Total Revenue: $${grandTotal}`, 20, yPos);
 
     const safeDateName = dateGroup.replace(/[\/\s,]+/g, '_');
-    docPdf.save(`Trueman_Summary_${safeDateName}.pdf`);
+    docPdf.save(`Trueman_TotalSumSummary_${safeDateName}.pdf`);
   };
 
   if (!user) {
@@ -210,13 +276,13 @@ export default function AdminDashboard() {
         {Object.entries(groupedOrders).map(([dateGroup, groupOrders]) => (
           <div key={dateGroup} className="mb-12">
             
-            <div className="flex justify-between items-center mb-6 border-b border-slate-700 pb-2">
+            <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 border-b border-slate-700 pb-4 gap-4">
               <h2 className="text-2xl font-bold text-orange-400">{dateGroup}</h2>
               <button 
-                onClick={() => generateSummaryPDF(dateGroup, groupOrders)} 
-                className="bg-blue-600 hover:bg-blue-500 text-white font-bold px-4 py-2 rounded-lg text-sm transition-colors flex items-center gap-2"
+                onClick={() => generateTotalSumSummaryPDF(dateGroup, groupOrders)} 
+                className="bg-emerald-600 hover:bg-emerald-500 text-white font-bold px-4 py-2 rounded-lg text-sm transition-colors flex items-center gap-2"
               >
-                Summarise 📊
+                Total Sum Summary 🧾
               </button>
             </div>
 
@@ -231,8 +297,13 @@ export default function AdminDashboard() {
                   <div>
                     <div className="flex justify-between items-start mb-4">
                       <div>
-                        <h3 className="font-bold text-lg">{order.customer}</h3>
-                        <p className="text-sm text-slate-400">{order.phone} &bull; {orderDate}</p>
+                        <h3 className="font-bold text-lg leading-tight">
+                          {order.customer} 
+                          <span className="block text-sm font-normal text-emerald-400 mt-1">{order.storeName || "No Store Name"}</span>
+                        </h3>
+                        <p className="text-xs text-slate-400 mt-2">{order.phone}</p>
+                        <p className="text-xs text-slate-400 mt-1 line-clamp-2">{order.address || "No Address"}</p>
+                        <p className="text-xs text-slate-500 mt-2">&bull; {orderDate}</p>
                       </div>
                       <span className={`px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider ${order.status === "Pending Payment" ? "bg-yellow-500/20 text-yellow-400" : "bg-emerald-500/20 text-emerald-400"}`}>
                         {order.status}
