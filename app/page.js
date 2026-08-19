@@ -23,6 +23,10 @@ export default function Storefront() {
   const [address, setAddress] = useState("");
   
   const [cart, setCart] = useState({});
+  // Custom Item State
+  const [customItemName, setCustomItemName] = useState("");
+  const [customItemQty, setCustomItemQty] = useState(0);
+
   const [isOrdering, setIsOrdering] = useState(false);
   const [deliveryDate, setDeliveryDate] = useState("Loading...");
 
@@ -50,14 +54,21 @@ export default function Storefront() {
 
   const handleCheckout = async () => {
     if (!customerName || !storeName || !phone || !address) return alert("Please fill in all your details (Name, Store, Phone, and Address).");
-    if (totalAmount === 0) return alert("Please add at least 1 tin to your cart.");
+    if (totalAmount === 0 && customItemQty === 0) return alert("Please add at least 1 item to your cart.");
     
     setIsOrdering(true);
     
     const orderItems = {};
+    // Add regular menu items
     MENU.forEach(item => {
       if (cart[item.id] > 0) orderItems[item.name] = cart[item.id];
     });
+
+    // Add custom item if it exists
+    if (customItemQty > 0) {
+      const cName = customItemName.trim() || 'Custom Request';
+      orderItems[`${cName} (TBD)`] = customItemQty;
+    }
 
     const dateObj = new Date();
     const yyyy = dateObj.getFullYear();
@@ -75,7 +86,8 @@ export default function Storefront() {
         address: address,
         items: orderItems,
         total: totalAmount,
-        status: "Pending Payment",
+        hasCustomItems: customItemQty > 0, // Flag for the admin dashboard
+        status: customItemQty > 0 ? "Pending Price Review" : "Pending Payment",
         deliveryDate: deliveryDate,
         createdAt: serverTimestamp()
       });
@@ -84,6 +96,8 @@ export default function Storefront() {
       alert("Order placed! Please check the downloaded PDF for payment details.");
       
       setCart({});
+      setCustomItemName("");
+      setCustomItemQty(0);
       setCustomerName("");
       setStoreName("");
       setPhone("");
@@ -114,14 +128,24 @@ export default function Storefront() {
     doc.text(`Delivery Date: ${deliveryDate}`, 20, yPos);
     
     yPos += 20;
+    
+    // Print Items
     Object.entries(items).forEach(([itemName, qty]) => {
-      const itemPrice = MENU.find(m => m.name === itemName)?.price || 0;
-      doc.text(`${itemName} Tins: ${qty} ($${qty * itemPrice})`, 20, yPos);
+      if (itemName.includes("(TBD)")) {
+        doc.text(`${itemName}: ${qty} (Price: TBD)`, 20, yPos);
+      } else {
+        const itemPrice = MENU.find(m => m.name === itemName)?.price || 0;
+        doc.text(`${itemName} Tins: ${qty} ($${qty * itemPrice})`, 20, yPos);
+      }
       yPos += 10;
     });
     
     doc.setFontSize(16);
-    doc.text(`Total Due: $${total}`, 20, yPos + 10);
+    if (customItemQty > 0) {
+      doc.text(`Estimated Total: $${total} + TBD`, 20, yPos + 10);
+    } else {
+      doc.text(`Total Due: $${total}`, 20, yPos + 10);
+    }
     
     doc.text("Payment Instructions:", 20, yPos + 30);
     
@@ -170,10 +194,36 @@ export default function Storefront() {
               </div>
             </div>
           ))}
+
+          {/* Custom / Untitled Item Row */}
+          <div className="flex justify-between items-center bg-orange-50/50 p-3 rounded-lg border border-orange-200 mt-4">
+            <div className="flex-1 mr-4">
+              <input
+                type="text"
+                placeholder="Other / Custom item (click to type)..."
+                value={customItemName}
+                onChange={(e) => setCustomItemName(e.target.value)}
+                className="w-full text-sm font-medium text-gray-800 border-b border-orange-300 focus:border-orange-500 focus:outline-none bg-transparent py-1 placeholder:text-gray-500"
+              />
+              <p className="text-xs text-orange-600 font-semibold mt-1">Price: TBD (Reviewed by admin)</p>
+            </div>
+            <div className="flex gap-3 items-center shrink-0">
+              <button onClick={() => setCustomItemQty(Math.max(0, customItemQty - 1))} className="bg-white hover:bg-gray-100 border border-gray-300 w-8 h-8 rounded-full font-bold flex items-center justify-center transition-colors text-gray-700">-</button>
+              <span className="font-bold w-5 text-center text-gray-800">{customItemQty}</span>
+              <button onClick={() => setCustomItemQty(customItemQty + 1)} className="bg-orange-500 hover:bg-orange-600 text-white w-8 h-8 rounded-full font-bold flex items-center justify-center transition-colors shadow-sm">+</button>
+            </div>
+          </div>
         </div>
 
-        <button onClick={handleCheckout} disabled={isOrdering} className="w-full bg-orange-500 hover:bg-orange-600 text-white font-bold py-4 rounded-xl shadow-lg transition-colors text-lg">
-          {isOrdering ? "Generating Order..." : `Checkout ($${totalAmount})`}
+        {/* Order Summary Note for TBD */}
+        {customItemQty > 0 && (
+          <p className="text-xs text-orange-700 mb-4 bg-orange-100 p-2 rounded text-center font-medium">
+            * Order includes a custom item. Final amount will be confirmed upon review.
+          </p>
+        )}
+
+        <button onClick={handleCheckout} disabled={isOrdering} className="w-full bg-orange-500 hover:bg-orange-600 disabled:opacity-70 text-white font-bold py-4 rounded-xl shadow-lg transition-colors text-lg">
+          {isOrdering ? "Generating Order..." : `Checkout ($${totalAmount}${customItemQty > 0 ? ' + TBD' : ''})`}
         </button>
       </div>
     </div>
