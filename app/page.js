@@ -23,9 +23,15 @@ export default function Storefront() {
   const [address, setAddress] = useState("");
   
   const [cart, setCart] = useState({});
-  // Custom Item State
-  const [customItemName, setCustomItemName] = useState("");
-  const [customItemQty, setCustomItemQty] = useState(0);
+  
+  // Custom Items State (Array of 5 slots)
+  const [customItems, setCustomItems] = useState([
+    { id: 1, name: '', qty: 0 },
+    { id: 2, name: '', qty: 0 },
+    { id: 3, name: '', qty: 0 },
+    { id: 4, name: '', qty: 0 },
+    { id: 5, name: '', qty: 0 },
+  ]);
 
   const [isOrdering, setIsOrdering] = useState(false);
   const [deliveryDate, setDeliveryDate] = useState("Loading...");
@@ -45,6 +51,8 @@ export default function Storefront() {
     return sum + (cart[item.id] || 0) * item.price;
   }, 0);
 
+  const totalCustomQty = customItems.reduce((sum, item) => sum + item.qty, 0);
+
   const updateCart = (itemId, amount) => {
     setCart(prev => ({
       ...prev,
@@ -52,23 +60,38 @@ export default function Storefront() {
     }));
   };
 
+  const updateCustomItemName = (id, newName) => {
+    setCustomItems(prev => prev.map(item => 
+      item.id === id ? { ...item, name: newName } : item
+    ));
+  };
+
+  const updateCustomItemQty = (id, amount) => {
+    setCustomItems(prev => prev.map(item => 
+      item.id === id ? { ...item, qty: Math.max(0, item.qty + amount) } : item
+    ));
+  };
+
   const handleCheckout = async () => {
     if (!customerName || !storeName || !phone || !address) return alert("Please fill in all your details (Name, Store, Phone, and Address).");
-    if (totalAmount === 0 && customItemQty === 0) return alert("Please add at least 1 item to your cart.");
+    if (totalAmount === 0 && totalCustomQty === 0) return alert("Please add at least 1 item to your cart.");
     
     setIsOrdering(true);
     
     const orderItems = {};
+    
     // Add regular menu items
     MENU.forEach(item => {
       if (cart[item.id] > 0) orderItems[item.name] = cart[item.id];
     });
 
-    // Add custom item if it exists
-    if (customItemQty > 0) {
-      const cName = customItemName.trim() || 'Custom Request';
-      orderItems[`${cName} (TBD)`] = customItemQty;
-    }
+    // Add custom items
+    customItems.forEach(item => {
+      if (item.qty > 0) {
+        const cName = item.name.trim() || `Custom Request ${item.id}`;
+        orderItems[`${cName} (TBD)`] = item.qty;
+      }
+    });
 
     const dateObj = new Date();
     const yyyy = dateObj.getFullYear();
@@ -86,8 +109,8 @@ export default function Storefront() {
         address: address,
         items: orderItems,
         total: totalAmount,
-        hasCustomItems: customItemQty > 0, // Flag for the admin dashboard
-        status: customItemQty > 0 ? "Pending Price Review" : "Pending Payment",
+        hasCustomItems: totalCustomQty > 0, 
+        status: totalCustomQty > 0 ? "Pending Price Review" : "Pending Payment",
         deliveryDate: deliveryDate,
         createdAt: serverTimestamp()
       });
@@ -95,9 +118,9 @@ export default function Storefront() {
       generateInvoice(customOrderId, totalAmount, orderItems);
       alert("Order placed! Please check the downloaded PDF for payment details.");
       
+      // Reset form
       setCart({});
-      setCustomItemName("");
-      setCustomItemQty(0);
+      setCustomItems(customItems.map(item => ({ ...item, name: '', qty: 0 })));
       setCustomerName("");
       setStoreName("");
       setPhone("");
@@ -138,10 +161,16 @@ export default function Storefront() {
         doc.text(`${itemName} Tins: ${qty} ($${qty * itemPrice})`, 20, yPos);
       }
       yPos += 10;
+      
+      // Add new page if list gets too long
+      if (yPos >= 280) {
+        doc.addPage();
+        yPos = 20;
+      }
     });
     
     doc.setFontSize(16);
-    if (customItemQty > 0) {
+    if (totalCustomQty > 0) {
       doc.text(`Estimated Total: $${total} + TBD`, 20, yPos + 10);
     } else {
       doc.text(`Total Due: $${total}`, 20, yPos + 10);
@@ -176,6 +205,7 @@ export default function Storefront() {
         </div>
         
         <div className="space-y-4 mb-8">
+          {/* Regular Menu Items */}
           {MENU.map((item) => (
             <div key={item.id} className="flex justify-between items-center bg-gray-50 p-3 rounded-lg border hover:border-orange-200 transition-colors">
               <div className="flex items-center gap-4">
@@ -195,35 +225,42 @@ export default function Storefront() {
             </div>
           ))}
 
-          {/* Custom / Untitled Item Row */}
-          <div className="flex justify-between items-center bg-orange-50/50 p-3 rounded-lg border border-orange-200 mt-4">
-            <div className="flex-1 mr-4">
-              <input
-                type="text"
-                placeholder="Other / Custom item (click to type)..."
-                value={customItemName}
-                onChange={(e) => setCustomItemName(e.target.value)}
-                className="w-full text-sm font-medium text-gray-800 border-b border-orange-300 focus:border-orange-500 focus:outline-none bg-transparent py-1 placeholder:text-gray-500"
-              />
-              <p className="text-xs text-orange-600 font-semibold mt-1">Price: TBD (Reviewed by admin)</p>
-            </div>
-            <div className="flex gap-3 items-center shrink-0">
-              <button onClick={() => setCustomItemQty(Math.max(0, customItemQty - 1))} className="bg-white hover:bg-gray-100 border border-gray-300 w-8 h-8 rounded-full font-bold flex items-center justify-center transition-colors text-gray-700">-</button>
-              <span className="font-bold w-5 text-center text-gray-800">{customItemQty}</span>
-              <button onClick={() => setCustomItemQty(customItemQty + 1)} className="bg-orange-500 hover:bg-orange-600 text-white w-8 h-8 rounded-full font-bold flex items-center justify-center transition-colors shadow-sm">+</button>
-            </div>
+          {/* Spacer for Custom Items */}
+          <div className="pt-4">
+            <h3 className="font-bold text-gray-700 mb-2">Special / Custom Orders</h3>
+            
+            {/* 5 Custom Item Rows */}
+            {customItems.map((cItem, index) => (
+              <div key={cItem.id} className="flex justify-between items-center bg-orange-50/50 p-3 rounded-lg border border-orange-200 mb-2">
+                <div className="flex-1 mr-4">
+                  <input
+                    type="text"
+                    placeholder={`Custom item ${index + 1} (click to type)...`}
+                    value={cItem.name}
+                    onChange={(e) => updateCustomItemName(cItem.id, e.target.value)}
+                    className="w-full text-sm font-medium text-gray-800 border-b border-orange-300 focus:border-orange-500 focus:outline-none bg-transparent py-1 placeholder:text-gray-500"
+                  />
+                  <p className="text-xs text-orange-600 font-semibold mt-1">Price: TBD (Reviewed by admin)</p>
+                </div>
+                <div className="flex gap-3 items-center shrink-0">
+                  <button onClick={() => updateCustomItemQty(cItem.id, -1)} className="bg-white hover:bg-gray-100 border border-gray-300 w-8 h-8 rounded-full font-bold flex items-center justify-center transition-colors text-gray-700">-</button>
+                  <span className="font-bold w-5 text-center text-gray-800">{cItem.qty}</span>
+                  <button onClick={() => updateCustomItemQty(cItem.id, 1)} className="bg-orange-500 hover:bg-orange-600 text-white w-8 h-8 rounded-full font-bold flex items-center justify-center transition-colors shadow-sm">+</button>
+                </div>
+              </div>
+            ))}
           </div>
         </div>
 
         {/* Order Summary Note for TBD */}
-        {customItemQty > 0 && (
-          <p className="text-xs text-orange-700 mb-4 bg-orange-100 p-2 rounded text-center font-medium">
-            * Order includes a custom item. Final amount will be confirmed upon review.
+        {totalCustomQty > 0 && (
+          <p className="text-xs text-orange-700 mb-4 bg-orange-100 p-3 rounded-lg text-center font-medium border border-orange-200">
+            * Order includes custom item(s). The final total amount will be reviewed and confirmed.
           </p>
         )}
 
         <button onClick={handleCheckout} disabled={isOrdering} className="w-full bg-orange-500 hover:bg-orange-600 disabled:opacity-70 text-white font-bold py-4 rounded-xl shadow-lg transition-colors text-lg">
-          {isOrdering ? "Generating Order..." : `Checkout ($${totalAmount}${customItemQty > 0 ? ' + TBD' : ''})`}
+          {isOrdering ? "Generating Order..." : `Checkout ($${totalAmount}${totalCustomQty > 0 ? ' + TBD' : ''})`}
         </button>
       </div>
     </div>
