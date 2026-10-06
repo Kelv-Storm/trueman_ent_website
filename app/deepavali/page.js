@@ -5,7 +5,7 @@ import { collection, addDoc, serverTimestamp, doc, onSnapshot } from 'firebase/f
 import { jsPDF } from "jspdf";
 import { DEEPAVALI_MENU } from './menu'; 
 
-const FIREBASE_COLLECTION = "deepavali_orders"; 
+const FIREBASE_COLLECTION = "orders"; 
 
 export default function DeepavaliStorefront() {
   const [customerName, setCustomerName] = useState("");
