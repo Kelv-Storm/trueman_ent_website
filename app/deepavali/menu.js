@@ -14,8 +14,7 @@ export const DEEPAVALI_MENU = [
   { id: 'bombay_mixture', name: 'Bombay Mixture', price: 12.00, image: '/bombay_mixture.jpg' },
   { id: 'achu_murukku', name: 'Achu Murukku', price: 12.00, image: '/achu_murukku.jpg' },
   { id: 'mullu_murukku', name: 'Mullu Murukku', price: 12.00, image: '/mullu_murukku.jpg' },
- { id: 'kambi_murukku', name: 'Kambi Murukku', price: 12.00, image: '/kambi_murukku.png' }, ];
-
+  { id: 'kambi_murukku', name: 'Kambi Murukku', price: 12.00, image: '/kambi_murukku.png' }, 
 
   // -----------------------------------------
   // NUTELLA & MAKMUR COOKIES ($16.00)
@@ -98,6 +97,5 @@ export const DEEPAVALI_MENU = [
   { id: 'marble_cake_big', name: 'Marble Cake Big', price: 18.00, image: '/marble_cake.jpg' },
   { id: 'mullu_murukku_tin', name: 'Mullu Murukku (Tin)', price: 60.00, image: '/mullu_murukku.jpg' },
   { id: 'achu_murukku_tin', name: 'Achu Murukku (Tin)', price: 60.00, image: '/achu_murukku.jpg' },
-  { id: 'kambi_murukku_tin', name: 'Kambi Murukku (Tin)', price: 60.00, image: '/kambi_murukku.png' }, ];
-
-
+  { id: 'kambi_murukku_tin', name: 'Kambi Murukku (Tin)', price: 60.00, image: '/kambi_murukku.png' }
+];
