@@ -140,7 +140,7 @@ export default function DeepavaliStorefront() {
         doc.text(`${itemName}: ${qty} (Price: TBD)`, 20, yPos);
       } else {
         const itemPrice = DEEPAVALI_MENU.find(m => m.name === itemName)?.price || 0;
-        doc.text(`${itemName} Tins: ${qty} (RM ${qty * itemPrice})`, 20, yPos);
+        doc.text(`${itemName} Tins: ${qty} ($ ${qty * itemPrice})`, 20, yPos);
       }
       yPos += 8;
       
@@ -152,9 +152,9 @@ export default function DeepavaliStorefront() {
     
     doc.setFontSize(16);
     if (totalCustomQty > 0) {
-      doc.text(`Estimated Total: RM ${total} + TBD`, 20, yPos + 10);
+      doc.text(`Estimated Total: $ ${total} + TBD`, 20, yPos + 10);
     } else {
-      doc.text(`Total Due: RM ${total}`, 20, yPos + 10);
+      doc.text(`Total Due: $ ${total}`, 20, yPos + 10);
     }
     
     doc.text("Payment Instructions:", 20, yPos + 30);
@@ -202,7 +202,7 @@ export default function DeepavaliStorefront() {
                 
                 <div>
                   <h3 className="font-bold leading-tight text-gray-800">{item.name}</h3>
-                  <p className="text-sm font-semibold text-orange-600 mt-1">RM {item.price}</p>
+                  <p className="text-sm font-semibold text-orange-600 mt-1">$ {item.price}</p>
                 </div>
               </div>
               <div className="flex gap-3 items-center shrink-0">
@@ -238,7 +238,7 @@ export default function DeepavaliStorefront() {
         </div>
 
         <button onClick={handleCheckout} disabled={isOrdering} className="w-full bg-orange-500 hover:bg-orange-600 disabled:opacity-70 text-white font-bold py-4 rounded-xl shadow-lg transition-colors text-lg sticky bottom-4">
-          {isOrdering ? "Processing..." : `Checkout (RM ${totalAmount}${totalCustomQty > 0 ? ' + TBD' : ''})`}
+          {isOrdering ? "Processing..." : `Checkout ($ ${totalAmount}${totalCustomQty > 0 ? ' + TBD' : ''})`}
         </button>
       </div>
     </div>
