@@ -139,8 +139,13 @@ export default function DeepavaliStorefront() {
       if (itemName.includes("(TBD)")) {
         doc.text(`${itemName}: ${qty} (Price: TBD)`, 20, yPos);
       } else {
-        const itemPrice = DEEPAVALI_MENU.find(m => m.name === itemName)?.price || 0;
-        doc.text(`${itemName} Tins: ${qty} ($ ${qty * itemPrice})`, 20, yPos);
+        // Find the item price correctly from DEEPAVALI_MENU
+        const menuItem = DEEPAVALI_MENU.find(m => m.name === itemName);
+        const itemPrice = menuItem ? menuItem.price : 0;
+        
+        // Only add "Tin" label if it's actually a tin, otherwise print just the name and correct subtotal
+        const label = itemName.toLowerCase().includes("tin") ? "Tins" : "Qty";
+        doc.text(`${itemName} (${qty} ${label}): RM ${qty * itemPrice}`, 20, yPos);
       }
       yPos += 8;
       
@@ -149,6 +154,24 @@ export default function DeepavaliStorefront() {
         yPos = 20;
       }
     });
+    
+    doc.setFontSize(16);
+    if (totalCustomQty > 0) {
+      doc.text(`Estimated Total: RM ${total} + TBD`, 20, yPos + 10);
+    } else {
+      doc.text(`Total Due: RM ${total}`, 20, yPos + 10);
+    }
+    
+    doc.text("Payment Instructions:", 20, yPos + 30);
+    doc.setFontSize(12);
+    doc.setFont("helvetica", "bold");
+    doc.text("1. Paynow UEN 53330872X Trueman Enterprise", 20, yPos + 40);
+    doc.setFont("helvetica", "normal");
+    doc.text("2. Put Order ID as Reference", 20, yPos + 50);
+    doc.text("3. WhatsApp receipt to +65 9816 4292 (Logan)", 20, yPos + 60);
+    
+    doc.save(`Trueman_Deepavali_${orderId}.pdf`);
+  };
     
     doc.setFontSize(16);
     if (totalCustomQty > 0) {
