@@ -139,13 +139,10 @@ export default function DeepavaliStorefront() {
       if (itemName.includes("(TBD)")) {
         doc.text(`${itemName}: ${qty} (Price: TBD)`, 20, yPos);
       } else {
-        // Find the item price correctly from DEEPAVALI_MENU
         const menuItem = DEEPAVALI_MENU.find(m => m.name === itemName);
         const itemPrice = menuItem ? menuItem.price : 0;
-        
-        // Only add "Tin" label if it's actually a tin, otherwise print just the name and correct subtotal
         const label = itemName.toLowerCase().includes("tin") ? "Tins" : "Qty";
-        doc.text(`${itemName} (${qty} ${label}): RM ${qty * itemPrice}`, 20, yPos);
+        doc.text(`${itemName} (${qty} ${label}): SGD ${qty * itemPrice}`, 20, yPos);
       }
       yPos += 8;
       
@@ -157,27 +154,9 @@ export default function DeepavaliStorefront() {
     
     doc.setFontSize(16);
     if (totalCustomQty > 0) {
-      doc.text(`Estimated Total: RM ${total} + TBD`, 20, yPos + 10);
+      doc.text(`Estimated Total: SGD ${total} + TBD`, 20, yPos + 10);
     } else {
-      doc.text(`Total Due: RM ${total}`, 20, yPos + 10);
-    }
-    
-    doc.text("Payment Instructions:", 20, yPos + 30);
-    doc.setFontSize(12);
-    doc.setFont("helvetica", "bold");
-    doc.text("1. Paynow UEN 53330872X Trueman Enterprise", 20, yPos + 40);
-    doc.setFont("helvetica", "normal");
-    doc.text("2. Put Order ID as Reference", 20, yPos + 50);
-    doc.text("3. WhatsApp receipt to +65 9816 4292 (Logan)", 20, yPos + 60);
-    
-    doc.save(`Trueman_Deepavali_${orderId}.pdf`);
-  };
-    
-    doc.setFontSize(16);
-    if (totalCustomQty > 0) {
-      doc.text(`Estimated Total: $ ${total} + TBD`, 20, yPos + 10);
-    } else {
-      doc.text(`Total Due: $ ${total}`, 20, yPos + 10);
+      doc.text(`Total Due: SGD ${total}`, 20, yPos + 10);
     }
     
     doc.text("Payment Instructions:", 20, yPos + 30);
@@ -214,18 +193,15 @@ export default function DeepavaliStorefront() {
           {DEEPAVALI_MENU.map((item) => (
             <div key={item.id} className="flex justify-between items-center bg-gray-50 p-3 rounded-lg border hover:border-orange-200 transition-colors">
               <div className="flex items-center gap-4">
-                
-                {/* Hides the image box entirely until you upload the actual image to the public folder */}
                 {item.image && (
                   <div className="w-16 h-16 aspect-square shrink-0 bg-gray-200 rounded-lg overflow-hidden border border-gray-300 hidden md:block">
-                    {/* The alt attribute prevents a broken image icon if the file doesn't exist yet */}
                     <img src={item.image} alt={item.name} onError={(e) => e.target.style.display='none'} className="w-full h-full object-cover object-center" />
                   </div>
                 )}
                 
                 <div>
                   <h3 className="font-bold leading-tight text-gray-800">{item.name}</h3>
-                  <p className="text-sm font-semibold text-orange-600 mt-1">$ {item.price}</p>
+                  <p className="text-sm font-semibold text-orange-600 mt-1">SGD {item.price}</p>
                 </div>
               </div>
               <div className="flex gap-3 items-center shrink-0">
@@ -261,7 +237,7 @@ export default function DeepavaliStorefront() {
         </div>
 
         <button onClick={handleCheckout} disabled={isOrdering} className="w-full bg-orange-500 hover:bg-orange-600 disabled:opacity-70 text-white font-bold py-4 rounded-xl shadow-lg transition-colors text-lg sticky bottom-4">
-          {isOrdering ? "Processing..." : `Checkout ($ ${totalAmount}${totalCustomQty > 0 ? ' + TBD' : ''})`}
+          {isOrdering ? "Processing..." : `Checkout (SGD ${totalAmount}${totalCustomQty > 0 ? ' + TBD' : ''})`}
         </button>
       </div>
     </div>
