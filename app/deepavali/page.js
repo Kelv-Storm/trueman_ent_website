@@ -149,7 +149,8 @@ export default function DeepavaliStorefront() {
     doc.setTextColor(255, 255, 255);
     doc.setFont("helvetica", "bold");
     doc.text("Item Description", 25, y + 6);
-    doc.text("Qty", 120, y + 6, { align: 'center' });
+    doc.text("Qty", 110, y + 6, { align: 'center' });
+    doc.text("Unit Price", 145, y + 6, { align: 'right' });
     doc.text("Subtotal", 185, y + 6, { align: 'right' });
     
     y += 8;
@@ -160,8 +161,9 @@ export default function DeepavaliStorefront() {
     Object.entries(items).forEach(([itemName, qty], index) => {
       const menuItem = DEEPAVALI_MENU.find(m => m.name === itemName);
       const itemPrice = menuItem ? menuItem.price : 0;
-      const subtotal = itemName.includes("(TBD)") ? "TBD" : `$${(qty * itemPrice).toFixed(2)}`;
-      const label = itemName.toLowerCase().includes("tin") ? "Tins" : "Qty";
+      
+      const unitPriceStr = itemName.includes("(TBD)") ? "TBD" : `$${itemPrice.toFixed(2)}`;
+      const subtotalStr = itemName.includes("(TBD)") ? "TBD" : `$${(qty * itemPrice).toFixed(2)}`;
 
       if (index % 2 === 0) {
         doc.setFillColor(245, 245, 245);
@@ -169,8 +171,9 @@ export default function DeepavaliStorefront() {
       }
 
       doc.text(itemName, 25, y + 6);
-      doc.text(`${qty} ${label}`, 120, y + 6, { align: 'center' });
-      doc.text(subtotal, 185, y + 6, { align: 'right' });
+      doc.text(String(qty), 110, y + 6, { align: 'center' }); // Shows just the value
+      doc.text(unitPriceStr, 145, y + 6, { align: 'right' });
+      doc.text(subtotalStr, 185, y + 6, { align: 'right' });
       
       doc.setDrawColor(220, 220, 220);
       doc.rect(20, y, 170, 8);
