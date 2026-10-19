@@ -3,7 +3,6 @@ import { useState, useEffect } from 'react';
 import { db } from '../../lib/firebase'; 
 import { collection, addDoc, serverTimestamp, doc, onSnapshot } from 'firebase/firestore';
 import { jsPDF } from "jspdf";
-import 'jspdf-autotable';
 import { DEEPAVALI_MENU } from './menu'; 
 
 const FIREBASE_COLLECTION = "orders"; 
@@ -120,6 +119,7 @@ export default function DeepavaliStorefront() {
   const generateInvoice = (orderId, total, items) => {
     const doc = new jsPDF();
     
+    // Header Branding
     doc.setFontSize(20);
     doc.setTextColor(234, 88, 12);
     doc.text("Trueman Enterprise", 20, 20);
@@ -128,6 +128,7 @@ export default function DeepavaliStorefront() {
     doc.setTextColor(0, 0, 0);
     doc.text("Official Invoice", 20, 28);
     
+    // Customer Info
     doc.setFontSize(10);
     doc.text(`Order ID: ${orderId}`, 20, 40);
     doc.text(`Customer: ${customerName}`, 20, 47);
@@ -137,66 +138,67 @@ export default function DeepavaliStorefront() {
     const splitAddress = doc.splitTextToSize(`Address: ${address}`, 170);
     doc.text(splitAddress, 20, 68);
     
-    let startY = 68 + (splitAddress.length * 6) + 4;
-    doc.text(`Delivery Date: ${deliveryDate}`, 20, startY);
+    let y = 68 + (splitAddress.length * 6) + 4;
+    doc.text(`Delivery Date: ${deliveryDate}`, 20, y);
     
-    startY += 10;
+    y += 10;
     
-    const tableRows = [];
-    Object.entries(items).forEach(([itemName, qty]) => {
-      if (itemName.includes("(TBD)")) {
-        tableRows.push([itemName, `${qty} Qty`, "TBD", "TBD"]);
-      } else {
-        const menuItem = DEEPAVALI_MENU.find(m => m.name === itemName);
-        const itemPrice = menuItem ? menuItem.price : 0;
-        const label = itemName.toLowerCase().includes("tin") ? "Tins" : "Qty";
-        
-        tableRows.push([
-          itemName,
-          `${qty} ${label}`,
-          `$${itemPrice.toFixed(2)}`,
-          `$${(qty * itemPrice).toFixed(2)}`
-        ]);
+    // Draw Table Header
+    doc.setFillColor(234, 88, 12);
+    doc.rect(20, y, 170, 8, 'F');
+    doc.setTextColor(255, 255, 255);
+    doc.setFont("helvetica", "bold");
+    doc.text("Item Description", 25, y + 6);
+    doc.text("Qty", 120, y + 6, { align: 'center' });
+    doc.text("Subtotal", 185, y + 6, { align: 'right' });
+    
+    y += 8;
+    doc.setTextColor(40, 40, 40);
+    doc.setFont("helvetica", "normal");
+    
+    // Draw Table Rows
+    Object.entries(items).forEach(([itemName, qty], index) => {
+      const menuItem = DEEPAVALI_MENU.find(m => m.name === itemName);
+      const itemPrice = menuItem ? menuItem.price : 0;
+      const subtotal = itemName.includes("(TBD)") ? "TBD" : `$${(qty * itemPrice).toFixed(2)}`;
+      const label = itemName.toLowerCase().includes("tin") ? "Tins" : "Qty";
+
+      if (index % 2 === 0) {
+        doc.setFillColor(245, 245, 245);
+        doc.rect(20, y, 170, 8, 'F');
+      }
+
+      doc.text(itemName, 25, y + 6);
+      doc.text(`${qty} ${label}`, 120, y + 6, { align: 'center' });
+      doc.text(subtotal, 185, y + 6, { align: 'right' });
+      
+      doc.setDrawColor(220, 220, 220);
+      doc.rect(20, y, 170, 8);
+      
+      y += 8;
+      if (y >= 270) {
+        doc.addPage();
+        y = 20;
       }
     });
     
-    doc.autoTable({
-      startY: startY,
-      head: [['Item Description', 'Quantity', 'Unit Price', 'Subtotal']],
-      body: tableRows,
-      theme: 'grid',
-      headStyles: { 
-        fillColor: [234, 88, 12], 
-        textColor: [255, 255, 255], 
-        fontStyle: 'bold' 
-      },
-      styles: { 
-        fontSize: 10, 
-        cellPadding: 5,
-        textColor: [40, 40, 40]
-      },
-      columnStyles: {
-        0: { cellWidth: 'auto' },
-        1: { cellWidth: 25, halign: 'center' },
-        2: { cellWidth: 30, halign: 'right' },
-        3: { cellWidth: 30, halign: 'right' },
-      }
-    });
+    y += 6;
     
-    const finalY = doc.lastAutoTable.finalY + 10;
-    
+    // Total Summary
     doc.setFontSize(12);
     doc.setFont("helvetica", "bold");
     const totalText = totalCustomQty > 0 ? `Estimated Total: $${total} + TBD` : `Total Due: $${total.toFixed(2)}`;
-    doc.text(totalText, 190, finalY, { align: 'right' });
+    doc.text(totalText, 190, y, { align: 'right' });
     
+    // Payment Instructions
+    y += 20;
     doc.setFontSize(11);
-    doc.text("Payment Instructions:", 20, finalY + 20);
+    doc.text("Payment Instructions:", 20, y);
     doc.setFontSize(10);
     doc.setFont("helvetica", "normal");
-    doc.text("1. Paynow UEN 53330872X Trueman Enterprise", 20, finalY + 28);
-    doc.text("2. Put Order ID as Reference", 20, finalY + 35);
-    doc.text("3. WhatsApp receipt to +65 9816 4292 (Logan)", 20, finalY + 42);
+    doc.text("1. Paynow UEN 53330872X Trueman Enterprise", 20, y + 8);
+    doc.text("2. Put Order ID as Reference", 20, y + 15);
+    doc.text("3. WhatsApp receipt to +65 9816 4292 (Logan)", 20, y + 22);
     
     doc.save(`Trueman_Invoice_${orderId}.pdf`);
   };
