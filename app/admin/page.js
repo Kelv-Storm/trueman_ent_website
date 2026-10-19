@@ -76,46 +76,88 @@ export default function AdminDashboard() {
     alert("Delivery date updated successfully!");
   };
 
-  // Individual Order PDF
+  // Individual Order PDF with Grid Table
   const downloadInvoice = (order) => {
     const docPdf = new jsPDF();
     const orderIdToPrint = order.orderId || order.id;
 
-    docPdf.setFontSize(22);
-    docPdf.text("Trueman Enterprise - Official Invoice", 20, 20);
-    
+    docPdf.setFontSize(20);
+    docPdf.setTextColor(234, 88, 12);
+    docPdf.text("Trueman Enterprise", 20, 20);
+
     docPdf.setFontSize(12);
+    docPdf.setTextColor(0, 0, 0);
+    docPdf.text("Official Invoice", 20, 28);
+    
+    docPdf.setFontSize(10);
     docPdf.text(`Order ID: ${orderIdToPrint}`, 20, 40);
-    docPdf.text(`Customer: ${order.customer}`, 20, 50);
-    docPdf.text(`Store: ${order.storeName || "N/A"}`, 20, 60);
-    docPdf.text(`Phone: ${order.phone}`, 20, 70);
+    docPdf.text(`Customer: ${order.customer}`, 20, 47);
+    docPdf.text(`Store: ${order.storeName || "N/A"}`, 20, 54);
+    docPdf.text(`Phone: ${order.phone}`, 20, 61);
     
     const splitAddress = docPdf.splitTextToSize(`Address: ${order.address || "N/A"}`, 170);
-    docPdf.text(splitAddress, 20, 80);
+    docPdf.text(splitAddress, 20, 68);
     
-    let yPos = 80 + (splitAddress.length * 7) + 5;
-    docPdf.text(`Delivery Date: ${order.deliveryDate || currentDate}`, 20, yPos);
+    let y = 68 + (splitAddress.length * 6) + 4;
+    docPdf.text(`Delivery Date: ${order.deliveryDate || currentDate}`, 20, y);
     
-    yPos += 20;
+    y += 10;
+
+    // Table Header
+    docPdf.setFillColor(234, 88, 12);
+    docPdf.rect(20, y, 170, 8, 'F');
+    docPdf.setTextColor(255, 255, 255);
+    docPdf.setFont("helvetica", "bold");
+    docPdf.text("Item Description", 25, y + 6);
+    docPdf.text("Qty", 110, y + 6, { align: 'center' });
+    docPdf.text("Unit Price", 145, y + 6, { align: 'right' });
+    docPdf.text("Subtotal", 185, y + 6, { align: 'right' });
+
+    y += 8;
+    docPdf.setTextColor(40, 40, 40);
+    docPdf.setFont("helvetica", "normal");
+
     if (order.items) {
-      Object.entries(order.items).forEach(([itemName, qty]) => {
+      Object.entries(order.items).forEach(([itemName, qty], index) => {
         const menuObj = MENU.find(m => m.name === itemName);
         const itemPrice = menuObj ? menuObj.price : 0;
-        docPdf.text(`${itemName} Tins: ${qty} ($${qty * itemPrice})`, 20, yPos);
-        yPos += 10;
+        const subtotalStr = itemName.includes("(TBD)") ? "TBD" : `$${(qty * itemPrice).toFixed(2)}`;
+        const unitPriceStr = itemName.includes("(TBD)") ? "TBD" : `$${itemPrice.toFixed(2)}`;
+
+        if (index % 2 === 0) {
+          docPdf.setFillColor(245, 245, 245);
+          docPdf.rect(20, y, 170, 8, 'F');
+        }
+
+        docPdf.text(itemName, 25, y + 6);
+        docPdf.text(String(qty), 110, y + 6, { align: 'center' });
+        docPdf.text(unitPriceStr, 145, y + 6, { align: 'right' });
+        docPdf.text(subtotalStr, 185, y + 6, { align: 'right' });
+
+        docPdf.setDrawColor(220, 220, 220);
+        docPdf.rect(20, y, 170, 8);
+
+        y += 8;
+        if (y >= 270) {
+          docPdf.addPage();
+          y = 20;
+        }
       });
     }
-    
-    docPdf.setFontSize(16);
-    docPdf.text(`Total Due: $${order.total}`, 20, yPos + 10);
-    
-    docPdf.text("Payment Instructions:", 20, yPos + 30);
+
+    y += 6;
     docPdf.setFontSize(12);
     docPdf.setFont("helvetica", "bold");
-    docPdf.text("1. Paynow UEN 53330872X Trueman Enterprise", 20, yPos + 40);
+    docPdf.text(`Total Due: $${order.total}`, 190, y, { align: 'right' });
+    
+    y += 20;
+    docPdf.setFontSize(11);
+    docPdf.text("Payment Instructions:", 20, y);
+    docPdf.setFontSize(10);
     docPdf.setFont("helvetica", "normal");
-    docPdf.text("2. Put Order ID as Reference", 20, yPos + 50);
-    docPdf.text("3. WhatsApp receipt to +65 9816 4292 (Logan)", 20, yPos + 60);
+    docPdf.text("1. Paynow UEN 53330872X Trueman Enterprise", 20, y + 8);
+    docPdf.text("2. Put Order ID as Reference", 20, y + 15);
+    docPdf.text("3. WhatsApp receipt to +65 9816 4292 (Logan)", 20, y + 22);
     
     const safeFilename = orderIdToPrint.replace(/\//g, '-');
     docPdf.save(`Trueman_Invoice_${safeFilename}.pdf`);
@@ -132,27 +174,17 @@ export default function AdminDashboard() {
     return groups;
   }, {});
 
-  // PDF 1: KITCHEN SUMMARY (No prices, no customer info)
+  // PDF 1: KITCHEN SUMMARY TABLE
   const generateKitchenSummaryPDF = (dateGroup, groupOrders) => {
     const docPdf = new jsPDF();
-    let yPos = 20;
-
-    const checkPageBreak = (neededHeight) => {
-      if (yPos + neededHeight > 280) {
-        docPdf.addPage();
-        yPos = 20;
-      }
-    };
-
-    docPdf.setFontSize(22);
-    docPdf.setFont("helvetica", "bold");
-    docPdf.text(`Kitchen Production Summary`, 20, yPos);
-    yPos += 10;
     
-    docPdf.setFontSize(14);
-    docPdf.setFont("helvetica", "normal");
-    docPdf.text(`Delivery Date: ${dateGroup}`, 20, yPos);
-    yPos += 15;
+    docPdf.setFontSize(18);
+    docPdf.setTextColor(234, 88, 12);
+    docPdf.text("Kitchen Production Summary", 20, 20);
+    
+    docPdf.setFontSize(11);
+    docPdf.setTextColor(100, 100, 100);
+    docPdf.text(`Delivery Date: ${dateGroup}`, 20, 28);
 
     const summaryData = {};
     groupOrders.forEach(order => {
@@ -163,17 +195,41 @@ export default function AdminDashboard() {
       }
     });
 
-    docPdf.setFontSize(14);
-    if (Object.keys(summaryData).length === 0) {
-      docPdf.text("No items ordered for this date.", 20, yPos);
+    let y = 38;
+
+    // Header Table
+    docPdf.setFillColor(234, 88, 12);
+    docPdf.rect(20, y, 170, 8, 'F');
+    docPdf.setTextColor(255, 255, 255);
+    docPdf.setFont("helvetica", "bold");
+    docPdf.text("Item Description", 25, y + 6);
+    docPdf.text("Total Quantity Required", 185, y + 6, { align: 'right' });
+
+    y += 8;
+    docPdf.setTextColor(40, 40, 40);
+    docPdf.setFont("helvetica", "normal");
+
+    const entries = Object.entries(summaryData).sort();
+    if (entries.length === 0) {
+      docPdf.text("No items ordered for this date.", 25, y + 6);
     } else {
-      Object.entries(summaryData).sort().forEach(([itemName, totalQty]) => {
-        checkPageBreak(15);
-        docPdf.text(`${itemName}:`, 20, yPos);
-        docPdf.setFont("helvetica", "bold");
-        docPdf.text(`${totalQty} tins`, 100, yPos);
-        docPdf.setFont("helvetica", "normal");
-        yPos += 10;
+      entries.forEach(([itemName, totalQty], index) => {
+        if (index % 2 === 0) {
+          docPdf.setFillColor(245, 245, 245);
+          docPdf.rect(20, y, 170, 8, 'F');
+        }
+
+        docPdf.text(itemName, 25, y + 6);
+        docPdf.text(String(totalQty), 185, y + 6, { align: 'right' });
+
+        docPdf.setDrawColor(220, 220, 220);
+        docPdf.rect(20, y, 170, 8);
+
+        y += 8;
+        if (y >= 270) {
+          docPdf.addPage();
+          y = 20;
+        }
       });
     }
 
@@ -181,58 +237,70 @@ export default function AdminDashboard() {
     docPdf.save(`Kitchen_Summary_${safeDateName}.pdf`);
   };
 
-  // PDF 2: CUSTOMER BREAKDOWN (For Dad's records)
+  // PDF 2: CUSTOMER BREAKDOWN & REVENUE TABLE
   const generateCustomerBreakdownPDF = (dateGroup, groupOrders) => {
     const docPdf = new jsPDF();
-    let yPos = 20;
-
-    const checkPageBreak = (neededHeight) => {
-      if (yPos + neededHeight > 280) {
-        docPdf.addPage();
-        yPos = 20;
-      }
-    };
-
-    docPdf.setFontSize(22);
-    docPdf.setFont("helvetica", "bold");
-    docPdf.text(`Customer Breakdown & Revenue`, 20, yPos);
-    yPos += 10;
     
-    docPdf.setFontSize(14);
-    docPdf.setFont("helvetica", "normal");
-    docPdf.text(`Delivery Date: ${dateGroup}`, 20, yPos);
-    yPos += 15;
+    docPdf.setFontSize(18);
+    docPdf.setTextColor(234, 88, 12);
+    docPdf.text("Customer Breakdown & Revenue", 20, 20);
+    
+    docPdf.setFontSize(11);
+    docPdf.setTextColor(100, 100, 100);
+    docPdf.text(`Delivery Date: ${dateGroup}`, 20, 28);
 
     let grandTotal = 0;
+    let y = 38;
 
-    groupOrders.forEach(order => {
-      grandTotal += (order.total || 0);
-      checkPageBreak(25);
-      
-      docPdf.setFontSize(12);
-      docPdf.setFont("helvetica", "bold");
-      const storeLabel = order.storeName ? `(${order.storeName})` : "";
-      docPdf.text(`${order.customer} ${storeLabel}`, 20, yPos);
-      
-      docPdf.text(`$${order.total}`, 170, yPos);
-      yPos += 6;
-      
-      let itemString = Object.entries(order.items || {}).map(([k, v]) => `${v}x ${k}`).join(', ');
-      docPdf.setFontSize(10);
-      docPdf.setFont("helvetica", "normal");
-      docPdf.setTextColor(100); 
-      
-      const splitItems = docPdf.splitTextToSize(itemString, 170);
-      docPdf.text(splitItems, 20, yPos);
-      yPos += (splitItems.length * 5) + 6;
-      docPdf.setTextColor(0); 
+    // Header Table
+    docPdf.setFillColor(234, 88, 12);
+    docPdf.rect(20, y, 170, 8, 'F');
+    docPdf.setTextColor(255, 255, 255);
+    docPdf.setFont("helvetica", "bold");
+    docPdf.text("Customer / Store", 25, y + 6);
+    docPdf.text("Items Ordered", 90, y + 6);
+    docPdf.text("Status", 150, y + 6);
+    docPdf.text("Total ($)", 185, y + 6, { align: 'right' });
+
+    y += 8;
+    docPdf.setTextColor(40, 40, 40);
+    docPdf.setFont("helvetica", "normal");
+
+    groupOrders.forEach((order, index) => {
+      const orderTotal = order.total || 0;
+      grandTotal += orderTotal;
+
+      const storeLabel = order.storeName ? ` (${order.storeName})` : "";
+      const customerStr = `${order.customer}${storeLabel}`;
+      const truncatedCustomer = customerStr.length > 25 ? customerStr.substring(0, 23) + '..' : customerStr;
+
+      const itemsStr = Object.entries(order.items || {}).map(([k, v]) => `${v}x ${k}`).join(', ');
+      const truncatedItems = itemsStr.length > 30 ? itemsStr.substring(0, 28) + '..' : itemsStr;
+
+      if (index % 2 === 0) {
+        docPdf.setFillColor(245, 245, 245);
+        docPdf.rect(20, y, 170, 8, 'F');
+      }
+
+      docPdf.text(truncatedCustomer, 25, y + 6);
+      docPdf.text(truncatedItems || "None", 90, y + 6);
+      docPdf.text(order.status || "Pending", 150, y + 6);
+      docPdf.text(`$${orderTotal.toFixed(2)}`, 185, y + 6, { align: 'right' });
+
+      docPdf.setDrawColor(220, 220, 220);
+      docPdf.rect(20, y, 170, 8);
+
+      y += 8;
+      if (y >= 270) {
+        docPdf.addPage();
+        y = 20;
+      }
     });
 
-    yPos += 10;
-    checkPageBreak(20);
-    docPdf.setFontSize(18);
+    y += 6;
+    docPdf.setFontSize(12);
     docPdf.setFont("helvetica", "bold");
-    docPdf.text(`Grand Total Revenue: $${grandTotal}`, 20, yPos);
+    docPdf.text(`Grand Total Revenue: $${grandTotal.toFixed(2)}`, 190, y, { align: 'right' });
 
     const safeDateName = dateGroup.replace(/[\/\s,]+/g, '_');
     docPdf.save(`Customer_Breakdown_${safeDateName}.pdf`);
@@ -323,7 +391,7 @@ export default function AdminDashboard() {
                     
                     <div className="bg-slate-900/50 p-4 rounded-lg mb-4 text-sm">
                       {order.items && Object.entries(order.items).map(([itemName, qty]) => (
-                        <p key={itemName}>{itemName}: <span className="font-bold text-orange-400">{qty} tins</span></p>
+                        <p key={itemName}>{itemName}: <span className="font-bold text-orange-400">{qty}</span></p>
                       ))}
                     </div>
                   </div>
