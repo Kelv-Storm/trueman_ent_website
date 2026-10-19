@@ -237,7 +237,7 @@ export default function AdminDashboard() {
     docPdf.save(`Kitchen_Summary_${safeDateName}.pdf`);
   };
 
-  // PDF 2: CUSTOMER BREAKDOWN & REVENUE TABLE
+// PDF 2: CUSTOMER BREAKDOWN & REVENUE TABLE (Fixed Column Spacing)
   const generateCustomerBreakdownPDF = (dateGroup, groupOrders) => {
     const docPdf = new jsPDF();
     
@@ -252,15 +252,15 @@ export default function AdminDashboard() {
     let grandTotal = 0;
     let y = 38;
 
-    // Header Table
+    // Header Table (Adjusted X-coordinates so columns don't overlap)
     docPdf.setFillColor(234, 88, 12);
     docPdf.rect(20, y, 170, 8, 'F');
     docPdf.setTextColor(255, 255, 255);
     docPdf.setFont("helvetica", "bold");
-    docPdf.text("Customer / Store", 25, y + 6);
-    docPdf.text("Items Ordered", 90, y + 6);
-    docPdf.text("Status", 150, y + 6);
-    docPdf.text("Total ($)", 185, y + 6, { align: 'right' });
+    docPdf.text("Customer / Store", 22, y + 6);
+    docPdf.text("Items Ordered", 78, y + 6);
+    docPdf.text("Status", 132, y + 6);
+    docPdf.text("Total ($)", 188, y + 6, { align: 'right' });
 
     y += 8;
     docPdf.setTextColor(40, 40, 40);
@@ -272,20 +272,26 @@ export default function AdminDashboard() {
 
       const storeLabel = order.storeName ? ` (${order.storeName})` : "";
       const customerStr = `${order.customer}${storeLabel}`;
-      const truncatedCustomer = customerStr.length > 25 ? customerStr.substring(0, 23) + '..' : customerStr;
+      // Truncate customer name if too long to prevent overlapping into Items column
+      const truncatedCustomer = customerStr.length > 22 ? customerStr.substring(0, 20) + '..' : customerStr;
 
       const itemsStr = Object.entries(order.items || {}).map(([k, v]) => `${v}x ${k}`).join(', ');
-      const truncatedItems = itemsStr.length > 30 ? itemsStr.substring(0, 28) + '..' : itemsStr;
+      // Truncate items list to keep it within column bounds
+      const truncatedItems = itemsStr.length > 24 ? itemsStr.substring(0, 22) + '..' : itemsStr;
+
+      // Clean status text
+      const statusStr = order.status || "Pending";
+      const truncatedStatus = statusStr.length > 18 ? statusStr.substring(0, 16) + '..' : statusStr;
 
       if (index % 2 === 0) {
         docPdf.setFillColor(245, 245, 245);
         docPdf.rect(20, y, 170, 8, 'F');
       }
 
-      docPdf.text(truncatedCustomer, 25, y + 6);
-      docPdf.text(truncatedItems || "None", 90, y + 6);
-      docPdf.text(order.status || "Pending", 150, y + 6);
-      docPdf.text(`$${orderTotal.toFixed(2)}`, 185, y + 6, { align: 'right' });
+      docPdf.text(truncatedCustomer, 22, y + 6);
+      docPdf.text(truncatedItems || "None", 78, y + 6);
+      docPdf.text(truncatedStatus, 132, y + 6);
+      docPdf.text(`$${orderTotal.toFixed(2)}`, 188, y + 6, { align: 'right' });
 
       docPdf.setDrawColor(220, 220, 220);
       docPdf.rect(20, y, 170, 8);
@@ -300,7 +306,7 @@ export default function AdminDashboard() {
     y += 6;
     docPdf.setFontSize(12);
     docPdf.setFont("helvetica", "bold");
-    docPdf.text(`Grand Total Revenue: $${grandTotal.toFixed(2)}`, 190, y, { align: 'right' });
+    docPdf.text(`Grand Total Revenue: $${grandTotal.toFixed(2)}`, 188, y, { align: 'right' });
 
     const safeDateName = dateGroup.replace(/[\/\s,]+/g, '_');
     docPdf.save(`Customer_Breakdown_${safeDateName}.pdf`);
